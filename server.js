@@ -29,6 +29,22 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Root route
+app.get('/', (req, res) => {
+  res.json({
+    message: 'E-commerce API is running!',
+    version: '1.0.0',
+    endpoints: {
+      products: '/api/products',
+      users: '/api/users',
+      orders: '/api/orders',
+      categories: '/api/categories',
+      productTypes: '/api/producttypes',
+      upload: '/api/upload'
+    }
+  });
+});
+
 // API Routes
 app.use('/api/products', productRoutes);
 app.use('/api/users', userRoutes);
