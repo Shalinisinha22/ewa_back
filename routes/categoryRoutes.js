@@ -1,21 +1,40 @@
 const express = require('express');
+const router = express.Router();
 const {
+  getPublicCategories,
   getCategories,
   getCategoryById,
   createCategory,
   updateCategory,
   deleteCategory,
-} = require('../controllers/categoryController.js');
-const { protect, admin } = require('../middleware/authMiddleware.js');
+  getCategoryTree,
+  getCategoryProducts,
+  reorderCategories
+} = require('../controllers/categoryController');
+const { protect, storeAccess, checkPermission } = require('../middleware/auth');
+const { identifyStore } = require('../middleware/storeIdentification');
 
-const router = express.Router();
+// Public routes (no authentication required)
+router.get('/public', identifyStore, getPublicCategories);
 
-router.route('/').get(getCategories).post(protect, admin, createCategory);
+// Protected routes
+router.use(protect);
+router.use(storeAccess);
+router.use(checkPermission('categories'));
 
-router
-  .route('/:id')
+// Category routes
+router.route('/')
+  .get(getCategories)
+  .post(createCategory);
+
+router.get('/tree', getCategoryTree);
+router.put('/reorder', reorderCategories);
+
+router.route('/:id')
   .get(getCategoryById)
-  .put(protect, admin, updateCategory)
-  .delete(protect, admin, deleteCategory);
+  .put(updateCategory)
+  .delete(deleteCategory);
+
+router.get('/:id/products', getCategoryProducts);
 
 module.exports = router;

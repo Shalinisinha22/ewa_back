@@ -1,191 +1,85 @@
-const asyncHandler = require('express-async-handler');
-const User = require('../models/userModel.js');
-const generateToken = require('../utils/generateToken.js');
+const Customer = require('../models/Customer');
 
-// @desc    Auth user & get token
-// @route   POST /api/users/login
-// @access  Public
-const authUser = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
-  console.log('authUser called with email:', email);
-  
-  let user = await User.findOne({ email });
-
-  // If user doesn't exist, create new account
-  if (!user) {
-    // user = await User.create({
-    //   name: email.split('@')[0], // Use part of email as name
-    //   email,
-    //   password,
-    //   isAdmin: true
-    // });
-    res.status(401);
-    throw new Error('Invalid email or password');
-  }
-
-  if (await user.matchPassword(password)) {
-    res.json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      isAdmin: user.isAdmin,
-      token: generateToken(user._id),
-    });
-  } else {
-    res.status(401);
-    throw new Error('Invalid email or password');
-  }
-});
-
-// @desc    Register a new user
-// @route   POST /api/users
-// @access  Public
-const registerUser = asyncHandler(async (req, res) => {
-  const { name, email, password } = req.body;
-
-  const userExists = await User.findOne({ email });
-
-  if (userExists) {
-    res.status(400);
-    throw new Error('User already exists');
-  }
-
-  const user = await User.create({
-    name,
-    email,
-    password,
-  });
-
-  if (user) {
-    res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      isAdmin: user.isAdmin,
-      token: generateToken(user._id),
-    });
-  } else {
-    res.status(400);
-    throw new Error('Invalid user data');
-  }
-});
-
-// @desc    Get user profile
-// @route   GET /api/users/profile
+// @desc    Get all users/customers
+// @route   GET /api/users
 // @access  Private
-const getUserProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
+const getUsers = async (req, res) => {
+  try {
+    const pageNumber = parseInt(req.query.pageNumber) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 10;
+    const keyword = req.query.keyword || '';
 
-  if (user) {
-    res.json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      isAdmin: user.isAdmin,
-    });
-  } else {
-    res.status(404);
-    throw new Error('User not found');
-  }
-});
+    let query = { storeId: req.storeId };
 
-// @desc    Update user profile
-// @route   PUT /api/users/profile
-// @access  Private
-const updateUserProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
-
-  if (user) {
-    user.name = req.body.name || user.name;
-    user.email = req.body.email || user.email;
-    if (req.body.password) {
-      user.password = req.body.password;
+    if (keyword) {
+      query.$or = [
+        { firstName: { $regex: keyword, $options: 'i' } },
+        { lastName: { $regex: keyword, $options: 'i' } },
+        { email: { $regex: keyword, $options: 'i' } }
+      ];
     }
 
-    const updatedUser = await user.save();
+    const count = await Customer.countDocuments(query);
+    const users = await Customer.find(query)
+      .select('-password')
+      .sort({ createdAt: -1 })
+      .limit(pageSize)
+      .skip(pageSize * (pageNumber - 1));
 
     res.json({
-      _id: updatedUser._id,
-      name: updatedUser.name,
-      email: updatedUser.email,
-      isAdmin: updatedUser.isAdmin,
-      token: generateToken(updatedUser._id),
+      users,
+      page: pageNumber,
+      pages: Math.ceil(count / pageSize),
+      total: count
     });
-  } else {
-    res.status(404);
-    throw new Error('User not found');
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
-});
-
-// @desc    Get all users
-// @route   GET /api/users
-// @access  Private/Admin
-const getUsers = asyncHandler(async (req, res) => {
-  const users = await User.find({});
-  res.json(users);
-});
-
-// @desc    Delete user
-// @route   DELETE /api/users/:id
-// @access  Private/Admin
-const deleteUser = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.params.id);
-
-  if (user) {
-    await User.deleteOne({ _id: user._id });
-    res.json({ message: 'User removed' });
-  } else {
-    res.status(404);
-    throw new Error('User not found');
-  }
-});
+};
 
 // @desc    Get user by ID
 // @route   GET /api/users/:id
-// @access  Private/Admin
-const getUserById = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.params.id).select('-password');
+// @access  Private
+const getUserById = async (req, res) => {
+  try {
+    const user = await Customer.findOne({
+      _id: req.params.id,
+      storeId: req.storeId
+    }).select('-password');
 
-  if (user) {
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
     res.json(user);
-  } else {
-    res.status(404);
-    throw new Error('User not found');
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
-});
+};
 
-// @desc    Update user
-// @route   PUT /api/users/:id
-// @access  Private/Admin
-const updateUser = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.params.id);
-
-  if (user) {
-    user.name = req.body.name || user.name;
-    user.email = req.body.email || user.email;
-    user.isAdmin = req.body.isAdmin ?? user.isAdmin;
-
-    const updatedUser = await user.save();
-
-    res.json({
-      _id: updatedUser._id,
-      name: updatedUser.name,
-      email: updatedUser.email,
-      isAdmin: updatedUser.isAdmin,
+// @desc    Delete user
+// @route   DELETE /api/users/:id
+// @access  Private
+const deleteUser = async (req, res) => {
+  try {
+    const user = await Customer.findOne({
+      _id: req.params.id,
+      storeId: req.storeId
     });
-  } else {
-    res.status(404);
-    throw new Error('User not found');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    await Customer.findByIdAndDelete(req.params.id);
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
-});
+};
 
 module.exports = {
-  authUser,
-  registerUser,
-  getUserProfile,
-  updateUserProfile,
   getUsers,
-  deleteUser,
   getUserById,
-  updateUser,
+  deleteUser
 };

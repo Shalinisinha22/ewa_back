@@ -1,114 +1,363 @@
-const asyncHandler = require('express-async-handler');
-const Category = require('../models/categoryModel.js');
+const Category = require('../models/Category');
+const Product = require('../models/Product');
 
-// @desc    Fetch all categories
+// @desc    Get all categories (Public)
+// @route   GET /api/categories/public
+// @access  Public
+const getPublicCategories = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+
+    let query = { 
+      status: 'active',
+      storeId: req.storeId 
+    };
+
+    // Search functionality
+    if (req.query.search) {
+      query.name = { $regex: req.query.search, $options: 'i' };
+    }
+
+    // Parent filter
+    if (req.query.parent) {
+      query.parent = req.query.parent;
+    } else if (req.query.topLevel === 'true') {
+      query.parent = null;
+    }
+
+    const categories = await Category.find(query)
+      .populate('parent', 'name slug')
+      .sort({ sortOrder: 1, name: 1 })
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Category.countDocuments(query);
+
+    res.json({
+      categories,
+      page,
+      pages: Math.ceil(total / limit),
+      total
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get all categories
 // @route   GET /api/categories
-// @access  Public
-const getCategories = asyncHandler(async (req, res) => {
-  const productType = req.query.productType || null;
-  
-  const query = {};
-  
-  if (productType) {
-    query.productType = productType;
-  }
-  
-  const categories = await Category.find(query);
-  res.json(categories);
-});
+// @access  Private
+const getCategories = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
 
-// @desc    Fetch single category
+    let query = { storeId: req.storeId };
+
+    // Search functionality
+    if (req.query.search) {
+      query.name = { $regex: req.query.search, $options: 'i' };
+    }
+
+    // Status filter
+    if (req.query.status) {
+      query.status = req.query.status;
+    }
+
+    // Parent filter
+    if (req.query.parent) {
+      query.parent = req.query.parent;
+    } else if (req.query.topLevel === 'true') {
+      query.parent = null;
+    }
+
+    const categories = await Category.find(query)
+      .populate('parent', 'name slug')
+      .sort({ sortOrder: 1, name: 1 })
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Category.countDocuments(query);
+
+    res.json({
+      categories,
+      page,
+      pages: Math.ceil(total / limit),
+      total
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get category by ID
 // @route   GET /api/categories/:id
-// @access  Public
-const getCategoryById = asyncHandler(async (req, res) => {
-  const category = await Category.findById(req.params.id);
+// @access  Private
+const getCategoryById = async (req, res) => {
+  try {
+    const category = await Category.findOne({
+      _id: req.params.id,
+      storeId: req.storeId
+    }).populate('parent', 'name slug');
 
-  if (category) {
+    if (!category) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+
     res.json(category);
-  } else {
-    res.status(404);
-    throw new Error('Category not found');
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
-});
+};
 
-// @desc    Delete a category
-// @route   DELETE /api/categories/:id
-// @access  Private/Admin
-const deleteCategory = asyncHandler(async (req, res) => {
-  const category = await Category.findById(req.params.id);
-
-  if (category) {
-    await Category.deleteOne({ _id: category._id });
-    res.json({ message: 'Category removed' });
-  } else {
-    res.status(404);
-    throw new Error('Category not found');
-  }
-});
-
-// @desc    Create a category
+// @desc    Create category
 // @route   POST /api/categories
-// @access  Private/Admin
-const createCategory = asyncHandler(async (req, res) => {
-  const { name, slug, description, image, parent, productType } = req.body;
+// @access  Private
+const createCategory = async (req, res) => {
+  try {
+    const categoryData = {
+      ...req.body,
+      storeId: req.storeId
+    };
 
-  const categoryExists = await Category.findOne({ slug });
-
-  if (categoryExists) {
-    res.status(400);
-    throw new Error('Category with this slug already exists');
-  }
-
-  const category = new Category({
-    name,
-    slug,
-    description,
-    image: image || '/uploads/sample-category.jpg',
-    parent: parent || null,
-    productType
-  });
-
-  const createdCategory = await category.save();
-  res.status(201).json(createdCategory);
-});
-
-// @desc    Update a category
-// @route   PUT /api/categories/:id
-// @access  Private/Admin
-const updateCategory = asyncHandler(async (req, res) => {
-  const { name, slug, description, image, parent, productType } = req.body;
-
-  const category = await Category.findById(req.params.id);
-
-  if (category) {
-    // Check if the new slug already exists and is not this category
-    if (slug && slug !== category.slug) {
-      const slugExists = await Category.findOne({ slug });
-      if (slugExists) {
-        res.status(400);
-        throw new Error('Category with this slug already exists');
+    // Validate parent category if provided
+    if (categoryData.parent) {
+      const parentCategory = await Category.findOne({
+        _id: categoryData.parent,
+        storeId: req.storeId
+      });
+      if (!parentCategory) {
+        return res.status(400).json({ message: 'Parent category not found' });
       }
     }
 
-    category.name = name || category.name;
-    category.slug = slug || category.slug;
-    category.description = description || category.description;
-    category.image = image || category.image;
-    category.parent = parent !== undefined ? parent : category.parent;
-    category.productType = productType || category.productType;
+    const category = await Category.create(categoryData);
+    
+    // Populate parent before sending response
+    await category.populate('parent', 'name slug');
 
-    const updatedCategory = await category.save();
-    res.json(updatedCategory);
-  } else {
-    res.status(404);
-    throw new Error('Category not found');
+    res.status(201).json(category);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
   }
-});
+};
+
+// @desc    Update category
+// @route   PUT /api/categories/:id
+// @access  Private
+const updateCategory = async (req, res) => {
+  try {
+    const category = await Category.findOne({
+      _id: req.params.id,
+      storeId: req.storeId
+    });
+
+    if (!category) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+
+    // Validate parent category if being updated
+    if (req.body.parent) {
+      // Prevent setting self as parent
+      if (req.body.parent === req.params.id) {
+        return res.status(400).json({ message: 'Category cannot be its own parent' });
+      }
+
+      const parentCategory = await Category.findOne({
+        _id: req.body.parent,
+        storeId: req.storeId
+      });
+      if (!parentCategory) {
+        return res.status(400).json({ message: 'Parent category not found' });
+      }
+
+      // Prevent circular references
+      const descendants = await category.getDescendants();
+      const descendantIds = descendants.map(d => d._id.toString());
+      if (descendantIds.includes(req.body.parent)) {
+        return res.status(400).json({ message: 'Cannot set descendant as parent' });
+      }
+    }
+
+    Object.assign(category, req.body);
+    const updatedCategory = await category.save();
+    
+    // Populate parent before sending response
+    await updatedCategory.populate('parent', 'name slug');
+
+    res.json(updatedCategory);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// @desc    Delete category
+// @route   DELETE /api/categories/:id
+// @access  Private
+const deleteCategory = async (req, res) => {
+  try {
+    const category = await Category.findOne({
+      _id: req.params.id,
+      storeId: req.storeId
+    });
+
+    if (!category) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+
+    // Check if category has products
+    const productCount = await Product.countDocuments({
+      category: req.params.id,
+      storeId: req.storeId
+    });
+
+    if (productCount > 0) {
+      return res.status(400).json({ 
+        message: `Cannot delete category with ${productCount} products. Please move or delete products first.` 
+      });
+    }
+
+    // Check if category has children
+    const childrenCount = await Category.countDocuments({
+      parent: req.params.id,
+      storeId: req.storeId
+    });
+
+    if (childrenCount > 0) {
+      return res.status(400).json({ 
+        message: `Cannot delete category with ${childrenCount} subcategories. Please delete subcategories first.` 
+      });
+    }
+
+    await Category.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Category deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get category tree
+// @route   GET /api/categories/tree
+// @access  Private
+const getCategoryTree = async (req, res) => {
+  try {
+    const categories = await Category.find({
+      storeId: req.storeId,
+      status: 'active'
+    }).sort({ level: 1, sortOrder: 1, name: 1 });
+
+    // Build tree structure
+    const categoryMap = {};
+    const tree = [];
+
+    // First pass: create map
+    categories.forEach(category => {
+      categoryMap[category._id] = {
+        ...category.toObject(),
+        children: []
+      };
+    });
+
+    // Second pass: build tree
+    categories.forEach(category => {
+      if (category.parent) {
+        const parent = categoryMap[category.parent];
+        if (parent) {
+          parent.children.push(categoryMap[category._id]);
+        }
+      } else {
+        tree.push(categoryMap[category._id]);
+      }
+    });
+
+    res.json(tree);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get category products
+// @route   GET /api/categories/:id/products
+// @access  Private
+const getCategoryProducts = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const category = await Category.findOne({
+      _id: req.params.id,
+      storeId: req.storeId
+    });
+
+    if (!category) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+
+    // Get products from this category and all subcategories
+    const descendants = await category.getDescendants();
+    const categoryIds = [category._id, ...descendants.map(d => d._id)];
+
+    const products = await Product.find({
+      storeId: req.storeId,
+      category: { $in: categoryIds },
+      status: 'active'
+    })
+      .populate('category', 'name slug')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Product.countDocuments({
+      storeId: req.storeId,
+      category: { $in: categoryIds },
+      status: 'active'
+    });
+
+    res.json({
+      products,
+      page,
+      pages: Math.ceil(total / limit),
+      total
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Reorder categories
+// @route   PUT /api/categories/reorder
+// @access  Private
+const reorderCategories = async (req, res) => {
+  try {
+    const { categories } = req.body; // Array of { id, sortOrder }
+
+    const bulkOps = categories.map(cat => ({
+      updateOne: {
+        filter: { _id: cat.id, storeId: req.storeId },
+        update: { sortOrder: cat.sortOrder }
+      }
+    }));
+
+    await Category.bulkWrite(bulkOps);
+
+    res.json({ message: 'Categories reordered successfully' });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
 
 module.exports = {
+  getPublicCategories,
   getCategories,
   getCategoryById,
-  deleteCategory,
   createCategory,
-  updateCategory
+  updateCategory,
+  deleteCategory,
+  getCategoryTree,
+  getCategoryProducts,
+  reorderCategories
 };

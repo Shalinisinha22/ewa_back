@@ -1,36 +1,39 @@
 const express = require('express');
 const router = express.Router();
 const {
-  getOrderById,
-  updateOrderStatus,
-  updateOrderToPaid,
   getOrders,
-  getOrderStatistics,
+  getOrderById,
+  createOrder,
+  updateOrder,
+  deleteOrder,
+  updateOrderStatus,
+  getOrderStats,
+  exportOrders,
+  refundOrder,
+  cancelOrder
 } = require('../controllers/orderController');
-const { protect, admin } = require('../middleware/authMiddleware');
-
-// Public routes
-// None
+const { protect, storeAccess, checkPermission } = require('../middleware/auth');
 
 // Protected routes
-router
-  .route('/')
-  .get(protect, admin, getOrders);
+router.use(protect);
+router.use(storeAccess);
+router.use(checkPermission('orders'));
 
-router
-  .route('/statistics')
-  .get(protect, admin, getOrderStatistics);
+// Order routes
+router.route('/')
+  .get(getOrders)
+  .post(createOrder);
 
-router
-  .route('/:id')
-  .get(protect, getOrderById);
+router.get('/stats', getOrderStats);
+router.get('/export', exportOrders);
 
-router
-  .route('/:id/status')
-  .put(protect, admin, updateOrderStatus);
+router.route('/:id')
+  .get(getOrderById)
+  .put(updateOrder)
+  .delete(deleteOrder);
 
-router
-  .route('/:id/pay')
-  .put(protect, updateOrderToPaid);
+router.put('/:id/status', updateOrderStatus);
+router.post('/:id/refund', refundOrder);
+router.put('/:id/cancel', cancelOrder);
 
 module.exports = router;
