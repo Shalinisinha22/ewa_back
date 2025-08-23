@@ -63,7 +63,9 @@ app.use(cors({
       'http://localhost:3001',
       'http://127.0.0.1:3000',
       'http://127.0.0.1:3001',
-      config.frontendUrl
+      'https://ewa-luxe.vercel.app/',
+      'https://ewaluxe-admin.vercel.app/'
+     
     ].filter(Boolean);
     
     if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
