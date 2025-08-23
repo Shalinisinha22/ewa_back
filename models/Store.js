@@ -89,8 +89,6 @@ const storeSchema = new mongoose.Schema({
 });
 
 // Index for efficient queries
-storeSchema.index({ slug: 1 });
-storeSchema.index({ domain: 1 });
 storeSchema.index({ status: 1 });
 
 module.exports = mongoose.model('Store', storeSchema);

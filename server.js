@@ -30,6 +30,16 @@ const { errorHandler, notFound } = require('./middleware/errorMiddleware');
 
 const app = express();
 
+// Set server timeout for video uploads
+app.use((req, res, next) => {
+  // Set timeout to 5 minutes for video upload routes
+  if (req.path.includes('/upload/video') || req.path.includes('/upload/videos')) {
+    req.setTimeout(300000); // 5 minutes
+    res.setTimeout(300000); // 5 minutes
+  }
+  next();
+});
+
 // Security middleware
 app.use(helmet());
 app.use(compression());
@@ -41,7 +51,6 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.'
 });
 app.use('/api/', limiter);
-
 
 // CORS configuration
 app.use(cors({
@@ -68,9 +77,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Store-ID']
 }));
 
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Body parsing middleware - increased limit for video uploads
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 // Serve static files from uploads directory with proper CORS headers
 app.use('/uploads', (req, res, next) => {

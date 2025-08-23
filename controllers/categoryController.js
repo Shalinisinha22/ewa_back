@@ -6,13 +6,32 @@ const Product = require('../models/Product');
 // @access  Public
 const getPublicCategories = async (req, res) => {
   try {
+    const { store } = req.query;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
     const skip = (page - 1) * limit;
 
+    if (!store) {
+      return res.status(400).json({ message: 'Store parameter is required' });
+    }
+
+    // Find store by name or slug
+    const Store = require('../models/Store');
+    const storeDoc = await Store.findOne({
+      $or: [
+        { name: store },
+        { slug: store }
+      ],
+      status: 'active'
+    });
+
+    if (!storeDoc) {
+      return res.status(404).json({ message: 'Store not found' });
+    }
+
     let query = { 
       status: 'active',
-      storeId: req.storeId 
+      storeId: storeDoc._id 
     };
 
     // Search functionality

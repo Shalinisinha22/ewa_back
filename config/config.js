@@ -6,6 +6,13 @@ const config = {
     jwtSecret: process.env.JWT_SECRET,
     nodeEnv: process.env.NODE_ENV,
     frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+    // Cloudinary configuration
+    cloudinary: {
+        cloudName: process.env.CLOUDINARY_CLOUD_NAME || 'dd4fdmtmj',
+        apiKey: process.env.CLOUDINARY_API_KEY,
+        apiSecret: process.env.CLOUDINARY_API_SECRET,
+        uploadPreset: process.env.CLOUDINARY_UPLOAD_PRESET || 'upload_ewa'
+    },
     // Add other configuration variables as needed
 };
 

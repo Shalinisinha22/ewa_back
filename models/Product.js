@@ -4,8 +4,7 @@ const productSchema = new mongoose.Schema({
   storeId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Store',
-    required: [true, 'Store ID is required'],
-    index: true
+    required: [true, 'Store ID is required']
   },
   name: {
     type: String,
@@ -29,8 +28,6 @@ const productSchema = new mongoose.Schema({
   },
   sku: {
     type: String,
-    unique: true,
-    sparse: true,
     uppercase: true
   },
   price: {
@@ -125,6 +122,14 @@ const productSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  isNewArrival: {
+    type: Boolean,
+    default: false
+  },
+  isTrending: {
+    type: Boolean,
+    default: false
+  },
   tags: [String],
   rating: {
     average: { type: Number, default: 0, min: 0, max: 5 },
@@ -158,6 +163,8 @@ const productSchema = new mongoose.Schema({
 productSchema.index({ storeId: 1, status: 1 });
 productSchema.index({ storeId: 1, category: 1 });
 productSchema.index({ storeId: 1, featured: 1 });
+productSchema.index({ storeId: 1, isNewArrival: 1 });
+productSchema.index({ storeId: 1, isTrending: 1 });
 productSchema.index({ storeId: 1, 'stock.quantity': 1 });
 productSchema.index({ slug: 1, storeId: 1 }, { unique: true });
 productSchema.index({ sku: 1 }, { unique: true, sparse: true });
@@ -193,6 +200,9 @@ productSchema.virtual('stockStatus').get(function() {
 
 // Pre-save middleware
 productSchema.pre('save', function(next) {
+  console.log('Product pre-save - Images before:', this.images);
+  console.log('Product pre-save - Videos before:', this.videos);
+  
   // Generate slug if not provided
   if (!this.slug && this.name) {
     this.slug = this.name
@@ -205,6 +215,9 @@ productSchema.pre('save', function(next) {
   if (this.status === 'active' && !this.publishedAt) {
     this.publishedAt = new Date();
   }
+  
+  console.log('Product pre-save - Images after:', this.images);
+  console.log('Product pre-save - Videos after:', this.videos);
   
   next();
 });

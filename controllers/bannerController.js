@@ -164,6 +164,61 @@ const getBannersByPosition = async (req, res) => {
   }
 };
 
+// @desc    Get public banners by position (for frontend)
+// @route   GET /api/banners/public/position/:position
+// @access  Public
+const getPublicBannersByPosition = async (req, res) => {
+  try {
+    const { position } = req.params;
+    const { store, page = 'home', device, userType, country } = req.query;
+
+    if (!store) {
+      return res.status(400).json({ message: 'Store parameter is required' });
+    }
+
+    // Find store by name or slug
+    const Store = require('../models/Store');
+    const storeDoc = await Store.findOne({
+      $or: [
+        { name: store },
+        { slug: store }
+      ],
+      status: 'active'
+    });
+
+    if (!storeDoc) {
+      return res.status(404).json({ message: 'Store not found' });
+    }
+
+    let query = {
+      storeId: storeDoc._id,
+      position,
+      status: 'active'
+    };
+
+    // Add placement filter
+    if (page !== 'all') {
+      query['placement.page'] = { $in: [page, 'all'] };
+    }
+
+    const banners = await Banner.find(query)
+      .sort({ priority: -1, createdAt: -1 });
+
+    // Filter banners based on display conditions
+    const filteredBanners = banners.filter(banner => {
+      return banner.shouldDisplay({
+        device,
+        userType,
+        country
+      });
+    });
+
+    res.json(filteredBanners);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Record banner impression
 // @route   POST /api/banners/:id/impression
 // @access  Private
@@ -269,6 +324,7 @@ module.exports = {
   updateBanner,
   deleteBanner,
   getBannersByPosition,
+  getPublicBannersByPosition,
   recordBannerImpression,
   recordBannerClick,
   getBannerAnalytics

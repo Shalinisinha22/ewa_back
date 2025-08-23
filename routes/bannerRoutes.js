@@ -7,11 +7,15 @@ const {
   updateBanner,
   deleteBanner,
   getBannersByPosition,
+  getPublicBannersByPosition,
   recordBannerImpression,
   recordBannerClick,
   getBannerAnalytics
 } = require('../controllers/bannerController');
 const { protect, storeAccess, checkPermission } = require('../middleware/auth');
+
+// Public routes (no authentication required)
+router.get('/public/position/:position', getPublicBannersByPosition);
 
 // Protected routes
 router.use(protect);

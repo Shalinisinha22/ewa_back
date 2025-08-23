@@ -171,6 +171,9 @@ const getProducts = async (req, res) => {
 // @access  Private
 const getProductById = async (req, res) => {
   try {
+    console.log('Get Product - ID:', req.params.id);
+    console.log('Get Product - Store ID:', req.storeId);
+    
     const product = await Product.findOne({
       _id: req.params.id,
       storeId: req.storeId
@@ -180,6 +183,9 @@ const getProductById = async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
+    console.log('Get Product - Found product images:', product.images);
+    console.log('Get Product - Found product videos:', product.videos);
+    
     res.json(product);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -191,10 +197,16 @@ const getProductById = async (req, res) => {
 // @access  Private
 const createProduct = async (req, res) => {
   try {
+    console.log('Create Product - Request Body:', req.body);
+    console.log('Create Product - Images:', req.body.images);
+    console.log('Create Product - Videos:', req.body.videos);
+    
     const productData = {
       ...req.body,
       storeId: req.storeId
     };
+    
+    console.log('Create Product - Product Data:', productData);
 
     // Validate category exists
     if (productData.category) {
@@ -228,6 +240,10 @@ const createProduct = async (req, res) => {
 // @access  Private
 const updateProduct = async (req, res) => {
   try {
+    console.log('Update Product - Request Body:', req.body);
+    console.log('Update Product - Images:', req.body.images);
+    console.log('Update Product - Videos:', req.body.videos);
+    
     const product = await Product.findOne({
       _id: req.params.id,
       storeId: req.storeId
@@ -251,8 +267,12 @@ const updateProduct = async (req, res) => {
       }
     }
 
+    console.log('Before update - Product images:', product.images);
     Object.assign(product, req.body);
+    console.log('After Object.assign - Product images:', product.images);
+    
     const updatedProduct = await product.save();
+    console.log('After save - Product images:', updatedProduct.images);
     
     // Populate category before sending response
     await updatedProduct.populate('category', 'name slug');
@@ -325,6 +345,50 @@ const getFeaturedProducts = async (req, res) => {
   }
 };
 
+// @desc    Get new arrival products
+// @route   GET /api/products/new-arrivals
+// @access  Private
+const getNewArrivalProducts = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+
+    const products = await Product.find({
+      storeId: req.storeId,
+      isNewArrival: true,
+      status: 'active'
+    })
+      .populate('category', 'name slug')
+      .sort({ createdAt: -1 })
+      .limit(limit);
+
+    res.json(products);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get trending products
+// @route   GET /api/products/trending
+// @access  Private
+const getTrendingProducts = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+
+    const products = await Product.find({
+      storeId: req.storeId,
+      isTrending: true,
+      status: 'active'
+    })
+      .populate('category', 'name slug')
+      .sort({ salesCount: -1, createdAt: -1 })
+      .limit(limit);
+
+    res.json(products);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Get products by category (Public)
 // @route   GET /api/products/public/category/:categoryId
 // @access  Public
@@ -356,6 +420,88 @@ const getPublicProductsByCategory = async (req, res) => {
       pages: Math.ceil(total / limit),
       total
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get public new arrival products
+// @route   GET /api/products/public/new-arrivals
+// @access  Public
+const getPublicNewArrivalProducts = async (req, res) => {
+  try {
+    const { store } = req.query;
+    const limit = parseInt(req.query.limit) || 10;
+
+    if (!store) {
+      return res.status(400).json({ message: 'Store parameter is required' });
+    }
+
+    // Find store by name or slug
+    const Store = require('../models/Store');
+    const storeDoc = await Store.findOne({
+      $or: [
+        { name: store },
+        { slug: store }
+      ],
+      status: 'active'
+    });
+
+    if (!storeDoc) {
+      return res.status(404).json({ message: 'Store not found' });
+    }
+
+    const products = await Product.find({
+      storeId: storeDoc._id,
+      isNewArrival: true,
+      status: 'active'
+    })
+      .populate('category', 'name slug')
+      .sort({ createdAt: -1 })
+      .limit(limit);
+
+    res.json(products);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get public trending products
+// @route   GET /api/products/public/trending
+// @access  Public
+const getPublicTrendingProducts = async (req, res) => {
+  try {
+    const { store } = req.query;
+    const limit = parseInt(req.query.limit) || 10;
+
+    if (!store) {
+      return res.status(400).json({ message: 'Store parameter is required' });
+    }
+
+    // Find store by name or slug
+    const Store = require('../models/Store');
+    const storeDoc = await Store.findOne({
+      $or: [
+        { name: store },
+        { slug: store }
+      ],
+      status: 'active'
+    });
+
+    if (!storeDoc) {
+      return res.status(404).json({ message: 'Store not found' });
+    }
+
+    const products = await Product.find({
+      storeId: storeDoc._id,
+      isTrending: true,
+      status: 'active'
+    })
+      .populate('category', 'name slug')
+      .sort({ salesCount: -1, createdAt: -1 })
+      .limit(limit);
+
+    res.json(products);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -658,8 +804,12 @@ module.exports = {
   updateProduct,
   deleteProduct,
   getFeaturedProducts,
+  getNewArrivalProducts,
+  getTrendingProducts,
   getPublicProducts,
   getPublicProductsByCategory,
+  getPublicNewArrivalProducts,
+  getPublicTrendingProducts,
   getProductsByCategory,
   searchProducts,
   updateProductStock,

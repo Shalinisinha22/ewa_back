@@ -133,7 +133,6 @@ const orderSchema = new mongoose.Schema({
 orderSchema.index({ storeId: 1, status: 1 });
 orderSchema.index({ storeId: 1, customer: 1 });
 orderSchema.index({ storeId: 1, createdAt: -1 });
-orderSchema.index({ orderNumber: 1 }, { unique: true });
 orderSchema.index({ 'payment.status': 1 });
 
 // Pre-save middleware to generate order number
