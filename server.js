@@ -150,6 +150,14 @@ app.get('/api/test-cors', (req, res) => {
   });
 });
 
+// Add a root route handler
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Welcome to EWA Fashion API',
+    status: 'Server is running'
+  });
+});
+
 // API routes
 app.use('/api/admin', adminRoutes);
 app.use('/api/products', productRoutes);
@@ -157,23 +165,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/stores', storeRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/customers', customerRoutes);
-
-// Customer auth routes with specific CORS handling
-app.use('/api/customer/auth', (req, res, next) => {
-  // Set CORS headers for customer auth routes
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Store-ID, X-Requested-With');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  
-  next();
-}, customerAuthRoutes);
-
+app.use('/api/auth', customerAuthRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/banners', bannerRoutes);
@@ -201,8 +193,13 @@ mongoose.connect(config.mongoURI)
     process.exit(1);
   });
 
-app.listen(config.port, () => {
-  console.log(`🚀 Server running in ${config.nodeEnv} mode on port ${config.port}`);
-});
-
+// Export for Vercel
 module.exports = app;
+
+// Start server if not in production
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  });
+}
