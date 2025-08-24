@@ -59,6 +59,7 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
+
 // CORS configuration
 const allowedOrigins = [
   'http://localhost:3000',
