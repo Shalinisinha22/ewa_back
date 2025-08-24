@@ -16,7 +16,7 @@ const identifyStore = async (req, res, next) => {
 
     // Method 2: Check query parameters
     if (!storeIdentifier && req.query.store) {
-      storeIdentifier = req.query.store;
+      storeIdentifier = decodeURIComponent(req.query.store);
     }
     
     // Method 2.5: Check storeId parameter (for logged-in users)
@@ -41,19 +41,14 @@ const identifyStore = async (req, res, next) => {
     }
 
     if (storeIdentifier) {
-      // Try to find store by name first, then by slug
-      let store = await Store.findOne({ 
-        name: { $regex: new RegExp(storeIdentifier, 'i') }, // Case-insensitive search
-        status: 'active' 
+      // Try to find store by name or slug (same approach as banner controller)
+      const store = await Store.findOne({
+        $or: [
+          { name: storeIdentifier },
+          { slug: storeIdentifier }
+        ],
+        status: 'active'
       });
-
-      // If not found by name, try by slug
-      if (!store) {
-        store = await Store.findOne({ 
-          slug: storeIdentifier, 
-          status: 'active' 
-        });
-      }
 
       if (store) {
         req.storeId = store._id.toString();
