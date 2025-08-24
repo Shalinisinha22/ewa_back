@@ -128,7 +128,8 @@ app.get('/api/health', (req, res) => {
     message: 'EWA Fashion API is running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
-    vercel: process.env.VERCEL
+    vercel: process.env.VERCEL,
+    mongoUri: config.mongoURI ? 'Configured' : 'Not configured'
   });
 });
 
@@ -138,6 +139,18 @@ app.get('/api', (req, res) => {
     message: 'EWA Fashion API is working',
     status: 'OK',
     timestamp: new Date().toISOString()
+  });
+});
+
+// Add a simple test route that doesn't require database
+app.get('/api/test-deployment', (req, res) => {
+  res.json({
+    status: 'OK',
+    message: 'Deployment test successful',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    vercel: process.env.VERCEL,
+    nodeVersion: process.version
   });
 });
 
@@ -162,25 +175,30 @@ app.use(notFound);
 app.use(errorHandler);
 
 // Database connection
-mongoose.connect(config.mongoURI)
-  .then(() => {
-    console.log('✅ Connected to MongoDB');
-    console.log(`📊 Database: ${config.mongoURI.split('/').pop().split('?')[0]}`);
-  })
-  .catch((error) => {
-    console.error('❌ MongoDB connection error:', error.message);
-    console.error('🔧 Please check your MongoDB connection string in .env file');
-    console.error('📝 Make sure your MongoDB credentials are correct');
-    console.error('📝 Example .env file:');
-    console.error('   MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/ewa-fashion');
-    
-    // In production, don't exit the process, just log the error
-    if (process.env.NODE_ENV === 'production') {
-      console.error('⚠️ Running in production mode - continuing without database connection');
-    } else {
-      process.exit(1);
-    }
-  });
+if (config.mongoURI) {
+  mongoose.connect(config.mongoURI)
+    .then(() => {
+      console.log('✅ Connected to MongoDB');
+      console.log(`📊 Database: ${config.mongoURI.split('/').pop().split('?')[0]}`);
+    })
+    .catch((error) => {
+      console.error('❌ MongoDB connection error:', error.message);
+      console.error('🔧 Please check your MongoDB connection string in .env file');
+      console.error('📝 Make sure your MongoDB credentials are correct');
+      console.error('📝 Example .env file:');
+      console.error('   MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/ewa-fashion');
+      
+      // In production, don't exit the process, just log the error
+      if (process.env.NODE_ENV === 'production') {
+        console.error('⚠️ Running in production mode - continuing without database connection');
+      } else {
+        process.exit(1);
+      }
+    });
+} else {
+  console.warn('⚠️ MONGO_URI not found - database connection skipped');
+  console.warn('📝 Please set MONGO_URI environment variable in Vercel');
+}
 
 // Export for Vercel
 module.exports = app;
