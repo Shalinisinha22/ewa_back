@@ -172,11 +172,6 @@ const getPublicBannersByPosition = async (req, res) => {
     const { position } = req.params;
     const { page = 'home', device, userType, country } = req.query;
 
-    console.log('🔍 Banner Debug - Position:', position);
-    console.log('🔍 Banner Debug - Store ID:', req.storeId);
-    console.log('🔍 Banner Debug - Page:', page);
-    console.log('🔍 Banner Debug - Query params:', req.query);
-
     let query = {
       storeId: req.storeId,
       position,
@@ -188,34 +183,20 @@ const getPublicBannersByPosition = async (req, res) => {
       query['placement.page'] = { $in: [page, 'all'] };
     }
 
-    console.log('🔍 Banner Debug - Final query:', JSON.stringify(query, null, 2));
-
     const banners = await Banner.find(query)
       .sort({ priority: -1, createdAt: -1 });
 
-    console.log('🔍 Banner Debug - Found banners:', banners.length);
-    console.log('🔍 Banner Debug - Banners:', banners.map(b => ({ id: b._id, title: b.title, position: b.position, status: b.status })));
-
     // Filter banners based on display conditions
     const filteredBanners = banners.filter(banner => {
-      console.log('🔍 Banner Debug - Checking banner:', banner.title);
-      console.log('🔍 Banner Debug - Banner display object:', banner.display);
-      console.log('🔍 Banner Debug - Banner targeting object:', banner.targeting);
-      
-      const shouldDisplay = banner.shouldDisplay({
+      return banner.shouldDisplay({
         device,
         userType,
         country
       });
-      console.log('🔍 Banner Debug - Banner should display:', banner.title, shouldDisplay);
-      return shouldDisplay;
     });
-
-    console.log('🔍 Banner Debug - Filtered banners:', filteredBanners.length);
 
     res.json(filteredBanners);
   } catch (error) {
-    console.error('❌ Banner Error:', error);
     res.status(500).json({ message: error.message });
   }
 };
