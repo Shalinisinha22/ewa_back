@@ -170,28 +170,15 @@ const getBannersByPosition = async (req, res) => {
 const getPublicBannersByPosition = async (req, res) => {
   try {
     const { position } = req.params;
-    const { store, page = 'home', device, userType, country } = req.query;
+    const { page = 'home', device, userType, country } = req.query;
 
-    if (!store) {
-      return res.status(400).json({ message: 'Store parameter is required' });
-    }
-
-    // Find store by name or slug
-    const Store = require('../models/Store');
-    const storeDoc = await Store.findOne({
-      $or: [
-        { name: store },
-        { slug: store }
-      ],
-      status: 'active'
-    });
-
-    if (!storeDoc) {
-      return res.status(404).json({ message: 'Store not found' });
-    }
+    console.log('🔍 Banner Debug - Position:', position);
+    console.log('🔍 Banner Debug - Store ID:', req.storeId);
+    console.log('🔍 Banner Debug - Page:', page);
+    console.log('🔍 Banner Debug - Query params:', req.query);
 
     let query = {
-      storeId: storeDoc._id,
+      storeId: req.storeId,
       position,
       status: 'active'
     };
@@ -201,20 +188,34 @@ const getPublicBannersByPosition = async (req, res) => {
       query['placement.page'] = { $in: [page, 'all'] };
     }
 
+    console.log('🔍 Banner Debug - Final query:', JSON.stringify(query, null, 2));
+
     const banners = await Banner.find(query)
       .sort({ priority: -1, createdAt: -1 });
 
+    console.log('🔍 Banner Debug - Found banners:', banners.length);
+    console.log('🔍 Banner Debug - Banners:', banners.map(b => ({ id: b._id, title: b.title, position: b.position, status: b.status })));
+
     // Filter banners based on display conditions
     const filteredBanners = banners.filter(banner => {
-      return banner.shouldDisplay({
+      console.log('🔍 Banner Debug - Checking banner:', banner.title);
+      console.log('🔍 Banner Debug - Banner display object:', banner.display);
+      console.log('🔍 Banner Debug - Banner targeting object:', banner.targeting);
+      
+      const shouldDisplay = banner.shouldDisplay({
         device,
         userType,
         country
       });
+      console.log('🔍 Banner Debug - Banner should display:', banner.title, shouldDisplay);
+      return shouldDisplay;
     });
+
+    console.log('🔍 Banner Debug - Filtered banners:', filteredBanners.length);
 
     res.json(filteredBanners);
   } catch (error) {
+    console.error('❌ Banner Error:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -248,6 +249,92 @@ const recordBannerClick = async (req, res) => {
     const banner = await Banner.findOne({
       _id: req.params.id,
       storeId: req.storeId
+    });
+
+    if (!banner) {
+      return res.status(404).json({ message: 'Banner not found' });
+    }
+
+    await banner.recordClick();
+    res.json({ message: 'Click recorded' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Record banner impression (public)
+// @route   POST /api/banners/public/:id/impression
+// @access  Public
+const recordPublicBannerImpression = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { store } = req.query;
+
+    if (!store) {
+      return res.status(400).json({ message: 'Store parameter is required' });
+    }
+
+    // Find store by name or slug
+    const Store = require('../models/Store');
+    const storeDoc = await Store.findOne({
+      $or: [
+        { name: store },
+        { slug: store }
+      ],
+      status: 'active'
+    });
+
+    if (!storeDoc) {
+      return res.status(404).json({ message: 'Store not found' });
+    }
+
+    const banner = await Banner.findOne({
+      _id: id,
+      storeId: storeDoc._id,
+      status: 'active'
+    });
+
+    if (!banner) {
+      return res.status(404).json({ message: 'Banner not found' });
+    }
+
+    await banner.recordImpression();
+    res.json({ message: 'Impression recorded' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Record banner click (public)
+// @route   POST /api/banners/public/:id/click
+// @access  Public
+const recordPublicBannerClick = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { store } = req.query;
+
+    if (!store) {
+      return res.status(400).json({ message: 'Store parameter is required' });
+    }
+
+    // Find store by name or slug
+    const Store = require('../models/Store');
+    const storeDoc = await Store.findOne({
+      $or: [
+        { name: store },
+        { slug: store }
+      ],
+      status: 'active'
+    });
+
+    if (!storeDoc) {
+      return res.status(404).json({ message: 'Store not found' });
+    }
+
+    const banner = await Banner.findOne({
+      _id: id,
+      storeId: storeDoc._id,
+      status: 'active'
     });
 
     if (!banner) {
@@ -327,5 +414,7 @@ module.exports = {
   getPublicBannersByPosition,
   recordBannerImpression,
   recordBannerClick,
+  recordPublicBannerImpression,
+  recordPublicBannerClick,
   getBannerAnalytics
 };

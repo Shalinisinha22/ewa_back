@@ -430,29 +430,10 @@ const getPublicProductsByCategory = async (req, res) => {
 // @access  Public
 const getPublicNewArrivalProducts = async (req, res) => {
   try {
-    const { store } = req.query;
     const limit = parseInt(req.query.limit) || 10;
 
-    if (!store) {
-      return res.status(400).json({ message: 'Store parameter is required' });
-    }
-
-    // Find store by name or slug
-    const Store = require('../models/Store');
-    const storeDoc = await Store.findOne({
-      $or: [
-        { name: store },
-        { slug: store }
-      ],
-      status: 'active'
-    });
-
-    if (!storeDoc) {
-      return res.status(404).json({ message: 'Store not found' });
-    }
-
     const products = await Product.find({
-      storeId: storeDoc._id,
+      storeId: req.storeId,
       isNewArrival: true,
       status: 'active'
     })
@@ -471,29 +452,10 @@ const getPublicNewArrivalProducts = async (req, res) => {
 // @access  Public
 const getPublicTrendingProducts = async (req, res) => {
   try {
-    const { store } = req.query;
     const limit = parseInt(req.query.limit) || 10;
 
-    if (!store) {
-      return res.status(400).json({ message: 'Store parameter is required' });
-    }
-
-    // Find store by name or slug
-    const Store = require('../models/Store');
-    const storeDoc = await Store.findOne({
-      $or: [
-        { name: store },
-        { slug: store }
-      ],
-      status: 'active'
-    });
-
-    if (!storeDoc) {
-      return res.status(404).json({ message: 'Store not found' });
-    }
-
     const products = await Product.find({
-      storeId: storeDoc._id,
+      storeId: req.storeId,
       isTrending: true,
       status: 'active'
     })

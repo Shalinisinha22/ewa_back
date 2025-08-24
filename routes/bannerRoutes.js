@@ -10,12 +10,17 @@ const {
   getPublicBannersByPosition,
   recordBannerImpression,
   recordBannerClick,
+  recordPublicBannerImpression,
+  recordPublicBannerClick,
   getBannerAnalytics
 } = require('../controllers/bannerController');
 const { protect, storeAccess, checkPermission } = require('../middleware/auth');
+const { identifyStore } = require('../middleware/storeIdentification');
 
 // Public routes (no authentication required)
-router.get('/public/position/:position', getPublicBannersByPosition);
+router.get('/public/position/:position', identifyStore, getPublicBannersByPosition);
+router.post('/public/:id/impression', identifyStore, recordPublicBannerImpression);
+router.post('/public/:id/click', identifyStore, recordPublicBannerClick);
 
 // Protected routes
 router.use(protect);
