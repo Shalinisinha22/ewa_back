@@ -43,15 +43,16 @@ const identifyStore = async (req, res, next) => {
       const defaultStore = await Store.findOne({ status: 'active' }).sort({ createdAt: 1 });
       if (defaultStore) {
         storeIdentifier = defaultStore.name; // Use store name instead of slug
+        console.log(`[Store Identification] Using default store: ${storeIdentifier}`);
       }
     }
 
     if (storeIdentifier) {
-      // Try to find store by name or slug (same approach as banner controller)
+      // Try to find store by name or slug (case-insensitive search)
       const store = await Store.findOne({
         $or: [
-          { name: storeIdentifier },
-          { slug: storeIdentifier }
+          { name: { $regex: new RegExp(`^${storeIdentifier}$`, 'i') } },
+          { slug: { $regex: new RegExp(`^${storeIdentifier}$`, 'i') } }
         ],
         status: 'active'
       });
@@ -59,13 +60,16 @@ const identifyStore = async (req, res, next) => {
       if (store) {
         req.storeId = store._id.toString();
         req.store = store;
+        console.log(`[Store Identification] Store found: ${store.name} (ID: ${store._id})`);
       } else {
+        console.log(`[Store Identification] Store not found for identifier: ${storeIdentifier}`);
         return res.status(404).json({ 
           message: 'Store not found',
           error: 'The requested store does not exist or is not active'
         });
       }
     } else {
+      console.log(`[Store Identification] No store identifier found`);
       return res.status(400).json({ 
         message: 'Store not specified',
         error: 'Please specify a store using subdomain, query parameter, or path'
