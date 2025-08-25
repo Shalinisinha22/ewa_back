@@ -6,6 +6,7 @@ const bannerSchema = new mongoose.Schema({
     ref: 'Store',
     required: [true, 'Store ID is required']
   },
+  
   title: {
     type: String,
     required: [true, 'Banner title is required'],
