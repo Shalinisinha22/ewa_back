@@ -89,6 +89,16 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Store-ID']
 }));
 
+// Root route handler
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Welcome to EWA Fashion API',
+    status: 'active',
+    documentation: '/api/docs',
+    version: '1.0.0'
+  });
+});
+
 // Body parsing middleware - increased limit for video uploads
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
@@ -154,6 +164,14 @@ app.get('/api/test-deployment', (req, res) => {
   });
 });
 
+// API routes with logging middleware
+const routeLogger = (req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+  next();
+};
+
+app.use(routeLogger);
+
 // API routes
 app.use('/api/admin', adminRoutes);
 app.use('/api/products', productRoutes);
@@ -168,6 +186,15 @@ app.use('/api/banners', bannerRoutes);
 app.use('/api/pages', pageRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/settings', settingRoutes);
+
+// Error handling for routes
+app.use((req, res, next) => {
+  res.status(404).json({
+    error: 'Not Found',
+    message: `Cannot ${req.method} ${req.originalUrl}`,
+    timestamp: new Date().toISOString()
+  });
+});
 app.use('/api/upload', uploadRoutes);
 
 // Error handling middleware
@@ -203,10 +230,12 @@ if (config.mongoURI) {
 // Export for Vercel
 module.exports = app;
 
-// Start server if not in production or if running locally
-if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
+// Start server only in development environment
+if (process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
-    console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+    console.log(`Server running in development mode on port ${PORT}`);
+    console.log(`Local: http://localhost:${PORT}`);
+    console.log(`API Health Check: http://localhost:${PORT}/api`);
   });
 }

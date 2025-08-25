@@ -3,6 +3,10 @@ const Store = require('../models/Store');
 // Store identification middleware for public routes
 const identifyStore = async (req, res, next) => {
   try {
+    console.log(`[Store Identification] Processing request for ${req.originalUrl}`);
+    console.log(`[Store Identification] Headers:`, req.headers);
+    console.log(`[Store Identification] Query:`, req.query);
+
     let storeIdentifier = null;
 
     // Method 1: Check subdomain
@@ -11,12 +15,14 @@ const identifyStore = async (req, res, next) => {
       const subdomain = host.split('.')[0];
       if (subdomain !== 'www' && subdomain !== 'localhost' && subdomain !== '127') {
         storeIdentifier = subdomain;
+        console.log(`[Store Identification] Found store identifier from subdomain: ${storeIdentifier}`);
       }
     }
 
     // Method 2: Check query parameters
     if (!storeIdentifier && req.query.store) {
       storeIdentifier = decodeURIComponent(req.query.store);
+      console.log(`[Store Identification] Found store identifier from query: ${storeIdentifier}`);
     }
     
     // Method 2.5: Check storeId parameter (for logged-in users)

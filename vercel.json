@@ -1,47 +1,9 @@
 {
   "version": 2,
   "builds": [
-    {
-      "src": "server.js",
-      "use": "@vercel/node",
-      "config": {
-        "maxDuration": 60,
-        "memory": 1024
-      }
-    }
+    { "src": "server.js", "use": "@vercel/node" }
   ],
   "routes": [
-    {
-      "src": "/api/stores/public/([^/]+)",
-      "dest": "/server.js"
-    },
-    {
-      "src": "/api/categories/public",
-      "dest": "/server.js"
-    },
-    {
-      "src": "/api/banners/public/position/([^/]+)",
-      "dest": "/server.js"
-    },
-    {
-      "src": "/api/products/public/trending",
-      "dest": "/server.js"
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "/server.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/server.js"
-    }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  },
-  "build": {
-    "env": {
-      "NODE_ENV": "production"
-    }
-  }
+    { "src": "/(.*)", "dest": "server.js" }
+  ]
 }
