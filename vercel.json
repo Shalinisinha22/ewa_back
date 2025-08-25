@@ -5,12 +5,28 @@
       "src": "server.js",
       "use": "@vercel/node",
       "config": {
-        "maxDuration": 30,
+        "maxDuration": 60,
         "memory": 1024
       }
     }
   ],
   "routes": [
+    {
+      "src": "/api/stores/public/([^/]+)",
+      "dest": "/server.js"
+    },
+    {
+      "src": "/api/categories/public",
+      "dest": "/server.js"
+    },
+    {
+      "src": "/api/banners/public/position/([^/]+)",
+      "dest": "/server.js"
+    },
+    {
+      "src": "/api/products/public/trending",
+      "dest": "/server.js"
+    },
     {
       "src": "/api/(.*)",
       "dest": "/server.js"
