@@ -9,20 +9,24 @@ const identifyStore = async (req, res, next) => {
 
     let storeIdentifier = null;
 
-    // Method 1: Check subdomain
-    const host = req.headers.host;
-    if (host && host.includes('.')) {
-      const subdomain = host.split('.')[0];
-      if (subdomain !== 'www' && subdomain !== 'localhost' && subdomain !== '127') {
-        storeIdentifier = subdomain;
-        console.log(`[Store Identification] Found store identifier from subdomain: ${storeIdentifier}`);
-      }
-    }
-
-    // Method 2: Check query parameters
-    if (!storeIdentifier && req.query.store) {
+    // Method 1: Check query parameters first (higher priority for API calls)
+    if (req.query.store) {
       storeIdentifier = decodeURIComponent(req.query.store);
       console.log(`[Store Identification] Found store identifier from query: ${storeIdentifier}`);
+    }
+
+    // Method 2: Check subdomain (but skip common API subdomains)
+    if (!storeIdentifier) {
+      const host = req.headers.host;
+      if (host && host.includes('.')) {
+        const subdomain = host.split('.')[0];
+        // Skip common API/backend subdomains
+        if (subdomain !== 'www' && subdomain !== 'localhost' && subdomain !== '127' && 
+            subdomain !== 'api' && subdomain !== 'backend' && !subdomain.includes('ewa-back')) {
+          storeIdentifier = subdomain;
+          console.log(`[Store Identification] Found store identifier from subdomain: ${storeIdentifier}`);
+        }
+      }
     }
     
     // Method 2.5: Check storeId parameter (for logged-in users)
