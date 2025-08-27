@@ -9,24 +9,20 @@ const identifyStore = async (req, res, next) => {
 
     let storeIdentifier = null;
 
-    // Method 1: Check query parameters first (higher priority for API calls)
-    if (req.query.store) {
-      storeIdentifier = decodeURIComponent(req.query.store);
-      console.log(`[Store Identification] Found store identifier from query: ${storeIdentifier}`);
+    // Method 1: Check subdomain
+    const host = req.headers.host;
+    if (host && host.includes('.')) {
+      const subdomain = host.split('.')[0];
+      if (subdomain !== 'www' && subdomain !== 'localhost' && subdomain !== '127') {
+        storeIdentifier = subdomain;
+        console.log(`[Store Identification] Found store identifier from subdomain: ${storeIdentifier}`);
+      }
     }
 
-    // Method 2: Check subdomain (but skip common API subdomains)
-    if (!storeIdentifier) {
-      const host = req.headers.host;
-      if (host && host.includes('.')) {
-        const subdomain = host.split('.')[0];
-        // Skip common API/backend subdomains
-        if (subdomain !== 'www' && subdomain !== 'localhost' && subdomain !== '127' && 
-            subdomain !== 'api' && subdomain !== 'backend' && !subdomain.includes('ewa-back')) {
-          storeIdentifier = subdomain;
-          console.log(`[Store Identification] Found store identifier from subdomain: ${storeIdentifier}`);
-        }
-      }
+    // Method 2: Check query parameters
+    if (!storeIdentifier && req.query.store) {
+      storeIdentifier = decodeURIComponent(req.query.store);
+      console.log(`[Store Identification] Found store identifier from query: ${storeIdentifier}`);
     }
     
     // Method 2.5: Check storeId parameter (for logged-in users)
@@ -47,16 +43,15 @@ const identifyStore = async (req, res, next) => {
       const defaultStore = await Store.findOne({ status: 'active' }).sort({ createdAt: 1 });
       if (defaultStore) {
         storeIdentifier = defaultStore.name; // Use store name instead of slug
-        console.log(`[Store Identification] Using default store: ${storeIdentifier}`);
       }
     }
 
     if (storeIdentifier) {
-      // Try to find store by name or slug (case-insensitive search)
+      // Try to find store by name or slug (same approach as banner controller)
       const store = await Store.findOne({
         $or: [
-          { name: { $regex: new RegExp(`^${storeIdentifier}$`, 'i') } },
-          { slug: { $regex: new RegExp(`^${storeIdentifier}$`, 'i') } }
+          { name: storeIdentifier },
+          { slug: storeIdentifier }
         ],
         status: 'active'
       });
@@ -64,16 +59,13 @@ const identifyStore = async (req, res, next) => {
       if (store) {
         req.storeId = store._id.toString();
         req.store = store;
-        console.log(`[Store Identification] Store found: ${store.name} (ID: ${store._id})`);
       } else {
-        console.log(`[Store Identification] Store not found for identifier: ${storeIdentifier}`);
         return res.status(404).json({ 
           message: 'Store not found',
           error: 'The requested store does not exist or is not active'
         });
       }
     } else {
-      console.log(`[Store Identification] No store identifier found`);
       return res.status(400).json({ 
         message: 'Store not specified',
         error: 'Please specify a store using subdomain, query parameter, or path'
