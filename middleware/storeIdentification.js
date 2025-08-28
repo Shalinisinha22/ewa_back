@@ -9,35 +9,40 @@ const identifyStore = async (req, res, next) => {
 
     let storeIdentifier = null;
 
-    // Method 1: Check subdomain
-    const host = req.headers.host;
-    if (host && host.includes('.')) {
-      const subdomain = host.split('.')[0];
-      if (subdomain !== 'www' && subdomain !== 'localhost' && subdomain !== '127') {
-        storeIdentifier = subdomain;
-        console.log(`[Store Identification] Found store identifier from subdomain: ${storeIdentifier}`);
-      }
-    }
-
-    // Method 2: Check query parameters
-    if (!storeIdentifier && req.query.store) {
+    // Method 1: Check query parameters FIRST (highest priority)
+    if (req.query.store) {
       storeIdentifier = decodeURIComponent(req.query.store);
       console.log(`[Store Identification] Found store identifier from query: ${storeIdentifier}`);
     }
     
-    // Method 2.5: Check storeId parameter (for logged-in users)
+    // Method 2: Check storeId parameter (for logged-in users)
     if (!storeIdentifier && req.query.storeId) {
       // If storeId is provided, use it directly
       req.storeId = req.query.storeId;
       return next();
     }
 
-    // Method 3: Check path parameter (for future use)
+    // Method 3: Check subdomain (lower priority)
+    if (!storeIdentifier) {
+      const host = req.headers.host;
+      if (host && host.includes('.')) {
+        const subdomain = host.split('.')[0];
+        // Exclude backend subdomain and common subdomains
+        if (subdomain !== 'www' && subdomain !== 'localhost' && subdomain !== '127' && subdomain !== 'ewa-back') {
+          storeIdentifier = subdomain;
+          console.log(`[Store Identification] Found store identifier from subdomain: ${storeIdentifier}`);
+        }
+      }
+    }
+    
+
+
+    // Method 4: Check path parameter (for future use)
     if (!storeIdentifier && req.params.storeSlug) {
       storeIdentifier = req.params.storeSlug;
     }
 
-    // Method 4: Default store (for development)
+    // Method 5: Default store (for development)
     if (!storeIdentifier) {
       // For development, use a default store
       const defaultStore = await Store.findOne({ status: 'active' }).sort({ createdAt: 1 });
