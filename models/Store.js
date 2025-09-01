@@ -31,8 +31,8 @@ const storeSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'inactive', 'suspended'],
-    default: 'active'
+    enum: ['active', 'pending', 'disabled'],
+    default: 'pending'
   },
   settings: {
     currency: {
@@ -46,6 +46,12 @@ const storeSchema = new mongoose.Schema({
     language: {
       type: String,
       default: 'en'
+    },
+    commissionRate: {
+      type: Number,
+      default: 8.0,
+      min: 0,
+      max: 100
     },
     theme: {
       primaryColor: { type: String, default: '#c30001' },

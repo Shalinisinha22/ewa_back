@@ -24,7 +24,6 @@ const pageRoutes = require('./routes/pageRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const settingRoutes = require('./routes/settingRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
-const paymentRoutes = require('./routes/paymentRoutes');
 
 // Import middleware
 const { errorHandler, notFound } = require('./middleware/errorMiddleware');
@@ -65,8 +64,10 @@ app.use('/api/', limiter);
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
+  'http://localhost:5173', // Vite dev server
   'http://127.0.0.1:3000',
   'http://127.0.0.1:3001',
+  'http://127.0.0.1:5173', // Vite dev server
   'https://ewa-luxe.vercel.app',
   'https://ewaluxe-admin.vercel.app',
   'https://ewa-back.vercel.app',
@@ -178,6 +179,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/stores', storeRoutes);
+app.use('/api/store-analytics', require('./routes/storeAnalyticsRoutes'));
 app.use('/api/orders', orderRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/auth', customerAuthRoutes);
@@ -187,7 +189,6 @@ app.use('/api/banners', bannerRoutes);
 app.use('/api/pages', pageRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/settings', settingRoutes);
-app.use('/api/payment', paymentRoutes);
 
 // Error handling for routes
 app.use((req, res, next) => {
