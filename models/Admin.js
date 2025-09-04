@@ -56,6 +56,12 @@ const adminSchema = new mongoose.Schema({
   },
   avatar: {
     type: String
+  },
+  resetPasswordToken: {
+    type: String
+  },
+  resetPasswordExpires: {
+    type: Date
   }
 }, {
   timestamps: true
@@ -88,6 +94,24 @@ adminSchema.methods.comparePassword = async function(candidatePassword) {
 // Update last login
 adminSchema.methods.updateLastLogin = function() {
   this.lastLogin = new Date();
+  return this.save();
+};
+
+// Generate password reset token
+adminSchema.methods.generatePasswordResetToken = function() {
+  const crypto = require('crypto');
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  
+  this.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+  this.resetPasswordExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  
+  return resetToken;
+};
+
+// Clear password reset token
+adminSchema.methods.clearPasswordResetToken = function() {
+  this.resetPasswordToken = undefined;
+  this.resetPasswordExpires = undefined;
   return this.save();
 };
 

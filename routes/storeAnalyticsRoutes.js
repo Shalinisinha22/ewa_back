@@ -21,3 +21,6 @@ router.get('/:storeId/revenue-trends', getStoreRevenueTrends);
 router.get('/:storeId/activity-logs', getStoreActivityLogs);
 
 module.exports = router;
+
+
+

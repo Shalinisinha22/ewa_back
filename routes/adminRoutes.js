@@ -10,13 +10,17 @@ const {
   loginAdmin,
   getProfile,
   updateProfile,
-  changePassword
+  changePassword,
+  forgotPassword,
+  resetPassword
 } = require('../controllers/adminController');
 const { protect, storeAccess, authorize } = require('../middleware/auth');
 
 // Public routes
 router.post('/login', loginAdmin);
 router.post('/super-admin', createSuperAdmin); // Initial super admin creation
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 
 // Protected routes
 router.use(protect);

@@ -2,6 +2,12 @@ const Admin = require('../models/Admin');
 const Store = require('../models/Store');
 const { generateToken } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const { 
+  sendPasswordResetEmail, 
+  sendSimpleEmail, 
+  generatePasswordResetEmailContent 
+} = require('../utils/brevoEmailService');
 
 // @desc    Create super admin (Initial setup)
 // @route   POST /api/admin/super-admin
@@ -415,6 +421,131 @@ const changePassword = async (req, res) => {
   }
 };
 
+// @desc    Forgot password
+// @route   POST /api/admin/forgot-password
+// @access  Public
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    // Check if admin exists
+    const admin = await Admin.findOne({ email });
+    if (!admin) {
+      // For security, don't reveal if email exists or not
+      return res.json({ 
+        message: 'If an account with that email exists, a password reset link has been sent.' 
+      });
+    }
+
+    // Generate reset token
+    const resetToken = admin.generatePasswordResetToken();
+    await admin.save();
+
+    // Generate reset URL
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+
+    try {
+      // Try to send email using Brevo template first
+      if (process.env.BREVO_API_KEY && process.env.BREVO_PASSWORD_RESET_TEMPLATE_ID) {
+        await sendPasswordResetEmail(admin.email, admin.name, resetToken, resetUrl);
+        console.log('Password reset email sent via Brevo template');
+      } else {
+        // Fallback to simple email if template is not configured
+        const { htmlContent, textContent } = generatePasswordResetEmailContent(
+          admin.name, 
+          resetUrl, 
+          'EWA Fashion'
+        );
+        
+        await sendSimpleEmail(
+          admin.email,
+          admin.name,
+          'Password Reset Request - EWA Fashion',
+          htmlContent,
+          textContent
+        );
+        console.log('Password reset email sent via simple email');
+      }
+
+      // Return success response
+      res.json({
+        message: 'If an account with that email exists, a password reset link has been sent.',
+        // Only include token in development for testing
+        resetToken: process.env.NODE_ENV === 'development' ? resetToken : undefined
+      });
+
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError);
+      
+      // Even if email fails, we still return success for security
+      // But log the error for debugging
+      res.json({
+        message: 'If an account with that email exists, a password reset link has been sent.',
+        // Include token in development even if email fails
+        resetToken: process.env.NODE_ENV === 'development' ? resetToken : undefined,
+        // Include email error in development for debugging
+        emailError: process.env.NODE_ENV === 'development' ? emailError.message : undefined
+      });
+    }
+
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Reset password
+// @route   POST /api/admin/reset-password
+// @access  Public
+const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ 
+        message: 'Token and new password are required' 
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ 
+        message: 'Password must be at least 6 characters long' 
+      });
+    }
+
+    // Hash the token to compare with stored token
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    // Find admin with valid token
+    const admin = await Admin.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
+
+    if (!admin) {
+      return res.status(400).json({ 
+        message: 'Invalid or expired reset token' 
+      });
+    }
+
+    // Update password
+    admin.password = newPassword;
+    await admin.clearPasswordResetToken();
+
+    res.json({ 
+      message: 'Password has been reset successfully' 
+    });
+
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   createSuperAdmin,
   createAdmin,
@@ -425,5 +556,7 @@ module.exports = {
   loginAdmin,
   getProfile,
   updateProfile,
-  changePassword
+  changePassword,
+  forgotPassword,
+  resetPassword
 };

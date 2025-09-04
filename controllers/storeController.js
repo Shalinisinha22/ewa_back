@@ -30,7 +30,19 @@ const getPublicStoreByIdentifier = async (req, res) => {
       });
     }
 
-    res.json({ store });
+    // Get admin email for the store
+    const admin = await Admin.findOne({ storeId: store._id }).select('email name status');
+
+    res.json({ 
+      store: {
+        ...store.toObject(),
+        admin: admin ? {
+          email: admin.email,
+          name: admin.name,
+          status: admin.status
+        } : null
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -52,7 +64,19 @@ const getDefaultStore = async (req, res) => {
       });
     }
 
-    res.json({ store });
+    // Get admin email for the store
+    const admin = await Admin.findOne({ storeId: store._id }).select('email name status');
+
+    res.json({ 
+      store: {
+        ...store.toObject(),
+        admin: admin ? {
+          email: admin.email,
+          name: admin.name,
+          status: admin.status
+        } : null
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -87,10 +111,25 @@ const getAllStores = async (req, res) => {
       .skip(skip)
       .limit(limit);
 
+    // Get admin emails for each store
+    const storesWithAdmins = await Promise.all(
+      stores.map(async (store) => {
+        const admin = await Admin.findOne({ storeId: store._id }).select('email name status');
+        return {
+          ...store.toObject(),
+          admin: admin ? {
+            email: admin.email,
+            name: admin.name,
+            status: admin.status
+          } : null
+        };
+      })
+    );
+
     const total = await Store.countDocuments(query);
 
     res.json({
-      stores,
+      stores: storesWithAdmins,
       page,
       pages: Math.ceil(total / limit),
       total
@@ -180,7 +219,12 @@ const createStore = async (req, res) => {
         name: store.name,
         slug: store.slug,
         status: store.status,
-        settings: store.settings
+        settings: store.settings,
+        admin: {
+          email: admin.email,
+          name: admin.name,
+          status: admin.status
+        }
       },
       admin: {
         _id: admin._id,
@@ -221,13 +265,21 @@ const updateStoreStatus = async (req, res) => {
       return res.status(404).json({ message: 'Store not found' });
     }
 
+    // Get admin email for the store
+    const admin = await Admin.findOne({ storeId: store._id }).select('email name status');
+
     res.json({
       message: 'Store status updated successfully',
       store: {
         _id: store._id,
         name: store.name,
         slug: store.slug,
-        status: store.status
+        status: store.status,
+        admin: admin ? {
+          email: admin.email,
+          name: admin.name,
+          status: admin.status
+        } : null
       }
     });
   } catch (error) {
@@ -293,6 +345,17 @@ const resetAdminPassword = async (req, res) => {
         _id: admin._id,
         name: admin.name,
         email: admin.email
+      },
+      store: {
+        _id: store._id,
+        name: store.name,
+        slug: store.slug,
+        status: store.status,
+        admin: {
+          email: admin.email,
+          name: admin.name,
+          status: admin.status
+        }
       }
     });
   } catch (error) {
@@ -333,9 +396,19 @@ const updateStore = async (req, res) => {
 
     await store.save();
 
+    // Get updated admin email for the store
+    const admin = await Admin.findOne({ storeId: store._id }).select('email name status');
+
     res.json({
       message: 'Store updated successfully',
-      store
+      store: {
+        ...store.toObject(),
+        admin: admin ? {
+          email: admin.email,
+          name: admin.name,
+          status: admin.status
+        } : null
+      }
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -358,7 +431,15 @@ const getStoreById = async (req, res) => {
     const admin = await Admin.findOne({ storeId: store._id }).select('-password');
 
     res.json({
-      store,
+      store: {
+        ...store.toObject(),
+        admin: admin ? {
+          email: admin.email,
+          name: admin.name,
+          status: admin.status,
+          role: admin.role
+        } : null
+      },
       admin
     });
   } catch (error) {
