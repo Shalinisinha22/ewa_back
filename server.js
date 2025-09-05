@@ -71,6 +71,7 @@ const allowedOrigins = [
   'https://ewa-luxe.vercel.app',
   'https://ewaluxe-admin.vercel.app',
   'https://ewa-back.vercel.app',
+  'https://ewa-super-admin.vercel.app',
   'https://ewa-luxe-git-main-shalini-s-projects.vercel.app',
   'https://ewa-luxe-shalini-s-projects.vercel.app'
 ].filter(Boolean);
