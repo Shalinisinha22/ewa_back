@@ -150,7 +150,10 @@ const createStore = async (req, res) => {
       adminName, 
       adminEmail, 
       adminPassword,
-      commissionRate = 8.0 
+      commissionRate = 8.0,
+      logo,
+      favicon,
+      theme
     } = req.body;
 
     // Check if store with this name or subdomain already exists
@@ -181,11 +184,19 @@ const createStore = async (req, res) => {
       slug: subdomain,
       description: `${name} - Fashion Store`,
       status: 'pending',
+      logo: logo || undefined,
+      favicon: favicon || undefined,
       settings: {
         currency: 'INR',
         timezone: 'Asia/Kolkata',
         language: 'en',
-        commissionRate: parseFloat(commissionRate)
+        commissionRate: parseFloat(commissionRate),
+        ...(theme && (theme.primaryColor || theme.secondaryColor)
+          ? { theme: {
+              ...(theme.primaryColor ? { primaryColor: theme.primaryColor } : {}),
+              ...(theme.secondaryColor ? { secondaryColor: theme.secondaryColor } : {})
+            } }
+          : {})
       }
     });
 
@@ -220,6 +231,8 @@ const createStore = async (req, res) => {
         slug: store.slug,
         status: store.status,
         settings: store.settings,
+        logo: store.logo,
+        favicon: store.favicon,
         admin: {
           email: admin.email,
           name: admin.name,
@@ -369,7 +382,7 @@ const resetAdminPassword = async (req, res) => {
 const updateStore = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, slug, adminName, adminEmail, commissionRate } = req.body;
+    const { name, slug, adminName, adminEmail, commissionRate, logo, favicon, theme, adminPassword } = req.body;
 
     const store = await Store.findById(id);
     if (!store) {
@@ -384,12 +397,33 @@ const updateStore = async (req, res) => {
       store.settings.commissionRate = commissionRate;
     }
 
+    // Update branding assets
+    if (logo !== undefined) {
+      store.logo = logo || undefined;
+    }
+    if (favicon !== undefined) {
+      store.favicon = favicon || undefined;
+    }
+
+    // Update theme colors
+    if (theme && (theme.primaryColor || theme.secondaryColor)) {
+      store.settings = store.settings || {};
+      store.settings.theme = {
+        ...(store.settings.theme || {}),
+        ...(theme.primaryColor ? { primaryColor: theme.primaryColor } : {}),
+        ...(theme.secondaryColor ? { secondaryColor: theme.secondaryColor } : {}),
+      };
+    }
+
     // Update admin details if provided
-    if (adminName || adminEmail) {
+    if (adminName || adminEmail || adminPassword) {
       const admin = await Admin.findOne({ storeId: store._id });
       if (admin) {
         if (adminName) admin.name = adminName;
         if (adminEmail) admin.email = adminEmail;
+        if (adminPassword && adminPassword.length >= 6) {
+          admin.password = adminPassword;
+        }
         await admin.save();
       }
     }
@@ -403,6 +437,8 @@ const updateStore = async (req, res) => {
       message: 'Store updated successfully',
       store: {
         ...store.toObject(),
+        logo: store.logo,
+        favicon: store.favicon,
         admin: admin ? {
           email: admin.email,
           name: admin.name,

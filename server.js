@@ -189,6 +189,7 @@ app.use('/api/banners', bannerRoutes);
 app.use('/api/pages', pageRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/settings', settingRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Error handling for routes
 app.use((req, res, next) => {
@@ -198,7 +199,6 @@ app.use((req, res, next) => {
     timestamp: new Date().toISOString()
   });
 });
-app.use('/api/upload', uploadRoutes);
 
 // Error handling middleware
 app.use(notFound);

@@ -43,9 +43,22 @@ const getStoreOverview = async (req, res) => {
     // Get all-time orders for total stats
     const allTimeOrders = await Order.find({ storeId });
 
+    // Calculate previous period for growth comparison
+    const periodDuration = now.getTime() - startDate.getTime();
+    const previousStartDate = new Date(startDate.getTime() - periodDuration);
+    const previousEndDate = new Date(startDate.getTime());
+
+    // Get previous period orders
+    const previousOrders = await Order.find({
+      storeId,
+      createdAt: { $gte: previousStartDate, $lt: previousEndDate }
+    });
+
     // Calculate revenue and commission
-    const totalRevenue = allTimeOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
-    const periodRevenue = orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+    const totalRevenue = allTimeOrders.reduce((sum, order) => sum + (order.pricing?.total || 0), 0);
+    const periodRevenue = orders.reduce((sum, order) => sum + (order.pricing?.total || 0), 0);
+    const previousPeriodRevenue = previousOrders.reduce((sum, order) => sum + (order.pricing?.total || 0), 0);
+    
     const commissionRate = store.settings?.commissionRate || 8.0;
     const totalCommission = totalRevenue * (commissionRate / 100);
     const periodCommission = periodRevenue * (commissionRate / 100);
@@ -53,18 +66,41 @@ const getStoreOverview = async (req, res) => {
     // Calculate order statistics
     const totalOrders = allTimeOrders.length;
     const periodOrders = orders.length;
+    const previousPeriodOrders = previousOrders.length;
     const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
-    // Get customer count
+    // Get customer counts for growth calculation
     const customerCount = await Customer.countDocuments({ storeId });
+    const previousPeriodCustomerCount = await Customer.countDocuments({
+      storeId,
+      createdAt: { $gte: previousStartDate, $lt: previousEndDate }
+    });
 
     // Get product count
     const productCount = await Product.countDocuments({ storeId });
 
-    // Calculate growth percentages (mock data for now)
-    const revenueGrowth = '+12.5%';
-    const orderGrowth = '+15.7%';
-    const customerGrowth = '+8.3%';
+    // Calculate real growth percentages
+    const calculateGrowthPercentage = (current, previous) => {
+      if (previous === 0) {
+        return current > 0 ? '+100%' : '0%';
+      }
+      const growth = ((current - previous) / previous) * 100;
+      return growth >= 0 ? `+${growth.toFixed(1)}%` : `${growth.toFixed(1)}%`;
+    };
+
+    const revenueGrowth = calculateGrowthPercentage(periodRevenue, previousPeriodRevenue);
+    const orderGrowth = calculateGrowthPercentage(periodOrders, previousPeriodOrders);
+    const customerGrowth = calculateGrowthPercentage(customerCount, previousPeriodCustomerCount);
+
+    // Debug logging for growth calculations
+    console.log(`Store ${storeId} Growth Calculations:`, {
+      timeRange,
+      currentPeriod: { start: startDate, end: now },
+      previousPeriod: { start: previousStartDate, end: previousEndDate },
+      revenue: { current: periodRevenue, previous: previousPeriodRevenue, growth: revenueGrowth },
+      orders: { current: periodOrders, previous: previousPeriodOrders, growth: orderGrowth },
+      customers: { current: customerCount, previous: previousPeriodCustomerCount, growth: customerGrowth }
+    });
 
     res.json({
       store: {
@@ -111,7 +147,7 @@ const getStoreOverview = async (req, res) => {
   }
 };
 
-// @desc    Get store customers
+// @desc    Get store customers with their order details
 // @route   GET /api/store-analytics/:storeId/customers
 // @access  Private (Super Admin)
 const getStoreCustomers = async (req, res) => {
@@ -135,10 +171,51 @@ const getStoreCustomers = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit));
 
+    // Get order details for each customer
+    const customersWithOrders = await Promise.all(
+      customers.map(async (customer) => {
+        const customerOrders = await Order.find({ 
+          storeId, 
+          customer: customer._id 
+        })
+        .sort({ createdAt: -1 })
+        .limit(10) // Get last 10 orders
+        .select('orderNumber pricing.total status createdAt');
+
+        const totalSpent = customerOrders.reduce((sum, order) => sum + (order.pricing?.total || 0), 0);
+        const totalOrders = customerOrders.length;
+
+        return {
+          ...customer.toObject(),
+          orderStats: {
+            totalOrders,
+            totalSpent,
+            lastOrderDate: customerOrders[0]?.createdAt || null,
+            recentOrders: customerOrders.map(order => ({
+              ...order.toObject(),
+              totalAmount: order.pricing?.total || 0
+            }))
+          }
+        };
+      })
+    );
+
     const total = await Customer.countDocuments(query);
 
+    // Debug logging
+    console.log(`Store ${storeId} Customers API Response:`, {
+      totalCustomers: total,
+      customersReturned: customersWithOrders.length,
+      sampleCustomer: customersWithOrders[0] ? {
+        id: customersWithOrders[0]._id,
+        name: customersWithOrders[0].name,
+        email: customersWithOrders[0].email,
+        orderStats: customersWithOrders[0].orderStats
+      } : null
+    });
+
     res.json({
-      customers,
+      customers: customersWithOrders,
       page: parseInt(page),
       pages: Math.ceil(total / limit),
       total
@@ -347,13 +424,145 @@ const getStoreActivityLogs = async (req, res) => {
   }
 };
 
+// @desc    Get store commission invoice for super admin
+// @route   GET /api/store-analytics/:storeId/commission-invoice
+// @access  Private (Super Admin)
+const getStoreCommissionInvoice = async (req, res) => {
+  try {
+    const { storeId } = req.params;
+    const { startDate, endDate } = req.query;
+
+    // Get store details
+    const store = await Store.findById(storeId);
+    if (!store) {
+      return res.status(404).json({ message: 'Store not found' });
+    }
+
+    // Set date range (default to last 30 days if not provided)
+    const now = new Date();
+    const defaultStartDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    
+    const start = startDate ? new Date(startDate) : defaultStartDate;
+    const end = endDate ? new Date(endDate) : now;
+
+    // Get orders in the date range (include all orders, not just delivered/completed)
+    const orders = await Order.find({
+      storeId,
+      createdAt: { $gte: start, $lte: end }
+    });
+
+    // Calculate commission details
+    const totalRevenue = orders.reduce((sum, order) => sum + (order.pricing?.total || 0), 0);
+    const commissionRate = store.settings?.commissionRate || 8.0;
+    
+    // Debug store settings
+    console.log(`Store ${storeId} Settings:`, {
+      commissionRate,
+      settings: store.settings
+    });
+    
+    const totalCommission = totalRevenue * (commissionRate / 100);
+    const netRevenue = totalRevenue - totalCommission;
+
+    // Get order breakdown by status
+    const orderBreakdown = await Order.aggregate([
+      { $match: { storeId, createdAt: { $gte: start, $lte: end } } },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+          totalAmount: { $sum: '$pricing.total' }
+        }
+      }
+    ]);
+
+    console.log(`Order breakdown for store ${storeId}:`, orderBreakdown);
+
+    // Get monthly breakdown for the period
+    const monthlyBreakdown = await Order.aggregate([
+      { 
+        $match: { 
+          storeId, 
+          createdAt: { $gte: start, $lte: end }
+        } 
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' }
+          },
+          revenue: { $sum: '$pricing.total' },
+          orders: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } }
+    ]);
+
+    console.log(`Monthly breakdown for store ${storeId}:`, monthlyBreakdown);
+
+    // Debug logging for commission invoice
+    console.log(`Store ${storeId} Commission Invoice Debug:`, {
+      dateRange: { start, end },
+      totalOrders: orders.length,
+      totalRevenue,
+      commissionRate,
+      totalCommission,
+      orderBreakdown,
+      monthlyBreakdown,
+      sampleOrders: orders.slice(0, 3).map(order => ({
+        id: order._id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        total: order.pricing?.total,
+        createdAt: order.createdAt
+      }))
+    });
+
+    const invoice = {
+      store: {
+        _id: store._id,
+        name: store.name,
+        slug: store.slug,
+        adminEmail: store.admin?.email,
+        commissionRate: commissionRate
+      },
+      period: {
+        start: start,
+        end: end,
+        days: Math.ceil((end - start) / (1000 * 60 * 60 * 24))
+      },
+      summary: {
+        totalOrders: orders.length,
+        totalRevenue: totalRevenue,
+        commissionRate: commissionRate,
+        totalCommission: totalCommission,
+        netRevenue: netRevenue
+      },
+      breakdown: {
+        orderStatus: orderBreakdown,
+        monthly: monthlyBreakdown
+      },
+      generatedAt: new Date()
+    };
+
+    res.json(invoice);
+  } catch (error) {
+    console.error('Commission invoice error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getStoreOverview,
   getStoreCustomers,
   getStoreOrders,
   getStoreRevenueTrends,
-  getStoreActivityLogs
+  getStoreActivityLogs,
+  getStoreCommissionInvoice
 };
+
+
 
 
 

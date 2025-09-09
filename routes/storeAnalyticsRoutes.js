@@ -5,7 +5,8 @@ const {
   getStoreCustomers,
   getStoreOrders,
   getStoreRevenueTrends,
-  getStoreActivityLogs
+  getStoreActivityLogs,
+  getStoreCommissionInvoice
 } = require('../controllers/storeAnalyticsController');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -19,8 +20,11 @@ router.get('/:storeId/customers', getStoreCustomers);
 router.get('/:storeId/orders', getStoreOrders);
 router.get('/:storeId/revenue-trends', getStoreRevenueTrends);
 router.get('/:storeId/activity-logs', getStoreActivityLogs);
+router.get('/:storeId/commission-invoice', getStoreCommissionInvoice);
 
 module.exports = router;
+
+
 
 
 

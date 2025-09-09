@@ -148,3 +148,5 @@ Common error scenarios:
 - Server errors
 
 All errors return appropriate HTTP status codes and error messages.
+
+
