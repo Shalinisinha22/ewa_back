@@ -70,9 +70,7 @@ const allowedOrigins = [
   'http://127.0.0.1:5173', // Vite dev server
   'https://ewa-luxe.vercel.app',
   'https://ewaluxe-admin.vercel.app',
-  'https://ewa-back.vercel.app',
-  'https://ewa-luxe-git-main-shalini-s-projects.vercel.app',
-  'https://ewa-luxe-shalini-s-projects.vercel.app'
+ 'https://ewa-super-admin.vercel.app/'
 ].filter(Boolean);
 
 app.use(cors({
