@@ -9,12 +9,14 @@ const {
   updateStore,
   deleteStore,
   resetAdminPassword,
-  getStoreById
+  getStoreById,
+  getPublicStoresList
 } = require('../controllers/storeController');
 const { protect, authorize } = require('../middleware/auth');
 
 // Public routes (no authentication required)
 // IMPORTANT: Put specific routes before parameterized routes
+router.get('/public/list', getPublicStoresList);
 router.get('/public/default', getDefaultStore);
 router.get('/public/:identifier', getPublicStoreByIdentifier);
 

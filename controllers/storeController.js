@@ -7,14 +7,21 @@ const bcrypt = require('bcryptjs');
 // @access  Public
 const getPublicStoreByIdentifier = async (req, res) => {
   try {
-    const identifier = req.params.identifier;
+    // Get identifier from URL parameter or query parameter
+    const identifier = req.params.identifier || req.query.store;
+    
+    if (!identifier) {
+      return res.status(400).json({ 
+        message: 'Store identifier is required',
+        error: 'Please provide a store identifier in the URL or as a query parameter'
+      });
+    }
     
     // Try to find store by name first (case-insensitive)
     let store = await Store.findOne({
       name: { $regex: new RegExp(identifier, 'i') },
       status: 'active'
     });
-
     // If not found by name, try by slug
     if (!store) {
       store = await Store.findOne({
@@ -53,6 +60,47 @@ const getPublicStoreByIdentifier = async (req, res) => {
 // @access  Public
 const getDefaultStore = async (req, res) => {
   try {
+    // Check if store parameter is provided in query
+    if (req.query.store) {
+      const identifier = req.query.store;
+      // Try to find store by name first (case-insensitive)
+      let store = await Store.findOne({
+        name: { $regex: new RegExp(identifier, 'i') },
+        status: 'active'
+      });
+
+      // If not found by name, try by slug
+      if (!store) {
+        store = await Store.findOne({
+          slug: identifier,
+          status: 'active'
+        });
+      }
+
+      if (!store) {
+        return res.status(404).json({ 
+          message: 'Store not found',
+          error: `The store '${identifier}' does not exist or is not active`
+        });
+      }
+
+      // Get admin email for the store
+      const admin = await Admin.findOne({ storeId: store._id }).select('email name status');
+
+
+      return res.json({ 
+        store: {
+          ...store.toObject(),
+          admin: admin ? {
+            email: admin.email,
+            name: admin.name,
+            status: admin.status
+          } : null
+        }
+      });
+    }
+
+    // Default behavior - get first active store
     const store = await Store.findOne({ 
       status: 'active' 
     }).sort({ createdAt: 1 });
@@ -483,6 +531,21 @@ const getStoreById = async (req, res) => {
   }
 };
 
+// @desc    Get all active stores (Public - for debugging)
+// @route   GET /api/stores/public/list
+// @access  Public
+const getPublicStoresList = async (req, res) => {
+  try {
+    const stores = await Store.find({ status: 'active' }).select('name slug description');
+    res.json({ 
+      stores: stores,
+      count: stores.length
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getPublicStoreByIdentifier,
   getDefaultStore,
@@ -492,5 +555,6 @@ module.exports = {
   updateStore,
   deleteStore,
   resetAdminPassword,
-  getStoreById
+  getStoreById,
+  getPublicStoresList
 }; 
