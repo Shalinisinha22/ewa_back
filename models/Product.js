@@ -167,7 +167,7 @@ productSchema.index({ storeId: 1, isNewArrival: 1 });
 productSchema.index({ storeId: 1, isTrending: 1 });
 productSchema.index({ storeId: 1, 'stock.quantity': 1 });
 productSchema.index({ slug: 1, storeId: 1 }, { unique: true });
-productSchema.index({ sku: 1 }, { unique: true, sparse: true });
+productSchema.index({ sku: 1, storeId: 1 }, { unique: true, sparse: true });
 
 // Text search index
 productSchema.index({

@@ -141,6 +141,33 @@ const createCategory = async (req, res) => {
 
     res.status(201).json(category);
   } catch (error) {
+    // Handle specific MongoDB errors
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      if (field === 'slug') {
+        return res.status(400).json({ 
+          message: `Category with slug "${error.keyValue.slug}" already exists in this store` 
+        });
+      } else if (field === 'name') {
+        return res.status(400).json({ 
+          message: `Category with name "${error.keyValue.name}" already exists in this store` 
+        });
+      } else {
+        return res.status(400).json({ 
+          message: 'Category already exists in this store' 
+        });
+      }
+    }
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ 
+        message: messages.join(', ') 
+      });
+    }
+    
+    // Handle other errors
     res.status(400).json({ message: error.message });
   }
 };
@@ -190,6 +217,33 @@ const updateCategory = async (req, res) => {
 
     res.json(updatedCategory);
   } catch (error) {
+    // Handle specific MongoDB errors
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      if (field === 'slug') {
+        return res.status(400).json({ 
+          message: `Category with slug "${error.keyValue.slug}" already exists in this store` 
+        });
+      } else if (field === 'name') {
+        return res.status(400).json({ 
+          message: `Category with name "${error.keyValue.name}" already exists in this store` 
+        });
+      } else {
+        return res.status(400).json({ 
+          message: 'Category already exists in this store' 
+        });
+      }
+    }
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ 
+        message: messages.join(', ') 
+      });
+    }
+    
+    // Handle other errors
     res.status(400).json({ message: error.message });
   }
 };
@@ -350,6 +404,32 @@ const reorderCategories = async (req, res) => {
   }
 };
 
+// @desc    Check if slug is available
+// @route   GET /api/categories/check-slug
+// @access  Private
+const checkSlugAvailability = async (req, res) => {
+  try {
+    const { slug } = req.query;
+    
+    if (!slug) {
+      return res.status(400).json({ message: 'Slug parameter is required' });
+    }
+
+    // Check if slug exists for this store
+    const existingCategory = await Category.findOne({
+      slug: slug,
+      storeId: req.storeId
+    });
+
+    res.json({ 
+      available: !existingCategory,
+      slug: slug 
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getPublicCategories,
   getCategories,
@@ -359,5 +439,6 @@ module.exports = {
   deleteCategory,
   getCategoryTree,
   getCategoryProducts,
-  reorderCategories
+  reorderCategories,
+  checkSlugAvailability
 };

@@ -9,7 +9,8 @@ const {
   deleteCategory,
   getCategoryTree,
   getCategoryProducts,
-  reorderCategories
+  reorderCategories,
+  checkSlugAvailability
 } = require('../controllers/categoryController');
 const { protect, storeAccess, checkPermission } = require('../middleware/auth');
 const { identifyStore } = require('../middleware/storeIdentification');
@@ -28,6 +29,7 @@ router.route('/')
   .post(createCategory);
 
 router.get('/tree', getCategoryTree);
+router.get('/check-slug', checkSlugAvailability);
 router.put('/reorder', reorderCategories);
 
 router.route('/:id')

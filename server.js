@@ -70,7 +70,9 @@ const allowedOrigins = [
   'http://127.0.0.1:5173', // Vite dev server
   'https://ewa-luxe.vercel.app',
   'https://ewaluxe-admin.vercel.app',
- 'https://ewa-super-admin.vercel.app'
+  'https://ewa-super-admin.vercel.app',
+  'https://ewa-frontend.vercel.app'
+
 ].filter(Boolean);
 
 app.use(cors({
@@ -78,10 +80,17 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
+    // Debug logging for CORS
+    console.log(`🔍 CORS Check - Origin: ${origin}`);
+    console.log(`🔍 Allowed Origins:`, allowedOrigins);
+    
     if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      console.log(`❌ CORS Blocked - Origin not in allowed list: ${origin}`);
+      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}. Allowed origins: ${allowedOrigins.join(', ')}`;
       return callback(new Error(msg), false);
     }
+    
+    console.log(`✅ CORS Allowed - Origin: ${origin}`);
     return callback(null, true);
   },
   credentials: true,
