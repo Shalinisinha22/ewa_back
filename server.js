@@ -25,6 +25,10 @@ const pageRoutes = require('./routes/pageRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const settingRoutes = require('./routes/settingRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
+const footerRoutes = require('./routes/footerRoutes');
+const invoiceRoutes = require('./routes/invoiceRoutes');
+const customerInvoiceRoutes = require('./routes/customerInvoiceRoutes');
+const wishlistRoutes = require('./routes/wishlistRoutes');
 
 // Import middleware
 const { errorHandler, notFound } = require('./middleware/errorMiddleware');
@@ -199,6 +203,10 @@ app.use('/api/pages', pageRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/settings', settingRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/footer', footerRoutes);
+app.use('/api/invoices', customerInvoiceRoutes);
+app.use('/api/invoices', invoiceRoutes);
+app.use('/api/wishlist', wishlistRoutes);
 
 // Error handling for routes
 app.use((req, res, next) => {

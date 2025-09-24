@@ -18,9 +18,12 @@ const customerSignup = async (req, res) => {
       });
     }
 
-    // Find store by name
+    // Find store by name or slug
     const store = await Store.findOne({ 
-      name: { $regex: new RegExp(storeName, 'i') },
+      $or: [
+        { name: { $regex: new RegExp(storeName, 'i') } },
+        { slug: { $regex: new RegExp(storeName, 'i') } }
+      ],
       status: 'active'
     });
 
@@ -42,16 +45,14 @@ const customerSignup = async (req, res) => {
       });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    // Password will be automatically hashed by the Customer model pre-save hook
 
     // Create customer
     const customer = await Customer.create({
       firstName,
       lastName,
       email: email.toLowerCase(),
-      password: hashedPassword,
+      password: password,
       phone,
       storeId: store._id,
       status: 'active'
@@ -103,11 +104,16 @@ const customerLogin = async (req, res) => {
       });
     }
 
-    // Find store by name
+    // Find store by name or slug
     const store = await Store.findOne({ 
-      name: { $regex: new RegExp(storeName, 'i') },
+      $or: [
+        { name: { $regex: new RegExp(storeName, 'i') } },
+        { slug: { $regex: new RegExp(storeName, 'i') } }
+      ],
       status: 'active'
     });
+
+    console.log(store,email,password,"login")
 
     if (!store) {
       return res.status(404).json({ 
@@ -120,6 +126,7 @@ const customerLogin = async (req, res) => {
       email: email.toLowerCase(),
       storeId: store._id
     }).select('+password');
+
 
     if (!customer) {
       return res.status(401).json({ 
@@ -330,6 +337,21 @@ const createCustomerOrder = async (req, res) => {
     const count = await Order.countDocuments({ storeId: req.customer.storeId });
     const orderNumber = `ORD-${Date.now()}-${(count + 1).toString().padStart(4, '0')}`;
 
+    // Map payment method to valid enum value
+    const paymentMethodMapping = {
+      'Cash on Delivery': 'cod',
+      'Credit Card': 'credit_card',
+      'Debit Card': 'debit_card',
+      'PayPal': 'paypal',
+      'Razorpay': 'razorpay',
+      'Stripe': 'stripe'
+    };
+
+    const mappedPayment = {
+      ...payment,
+      method: paymentMethodMapping[payment.method] || payment.method
+    };
+
     // Create order data
     const orderData = {
       storeId: req.customer.storeId,
@@ -344,7 +366,7 @@ const createCustomerOrder = async (req, res) => {
       })),
       billing,
       shipping,
-      payment,
+      payment: mappedPayment,
       pricing,
       status
     };
@@ -360,6 +382,48 @@ const createCustomerOrder = async (req, res) => {
         product.stock.quantity -= item.quantity;
         await product.save();
       }
+    }
+
+    // Generate invoice automatically
+    try {
+      const Invoice = require('../models/Invoice');
+      
+      // Check if invoice already exists
+      const existingInvoice = await Invoice.findOne({ orderId: savedOrder._id });
+      if (!existingInvoice) {
+        // Create invoice data from order
+        const invoiceData = {
+          orderId: savedOrder._id,
+          storeId: savedOrder.storeId,
+          customer: savedOrder.customer,
+          items: savedOrder.items.map(item => ({
+            product: item.product,
+            name: item.name,
+            quantity: item.quantity,
+            unitPrice: item.price,
+            totalPrice: item.price * item.quantity,
+            taxRate: 0,
+            taxAmount: 0
+          })),
+          billing: savedOrder.billing,
+          shipping: savedOrder.shipping,
+          payment: savedOrder.payment,
+          pricing: savedOrder.pricing,
+          status: savedOrder.payment.status === 'completed' ? 'paid' : 'sent',
+          metadata: {
+            generatedBy: null, // System generated
+            template: 'default'
+          }
+        };
+
+        // Create the invoice
+        const invoice = new Invoice(invoiceData);
+        await invoice.save();
+        console.log(`Invoice generated for order ${savedOrder.orderNumber}`);
+      }
+    } catch (invoiceError) {
+      console.error('Error generating invoice:', invoiceError);
+      // Don't fail the order creation if invoice generation fails
     }
 
     // Populate customer info for response

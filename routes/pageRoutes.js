@@ -9,9 +9,16 @@ const {
   getPageBySlug,
   getPublishedPages,
   duplicatePage,
-  getPageStats
+  getPageStats,
+  getPageByType,
+  getPublicPages,
+  createDefaultPages
 } = require('../controllers/pageController');
 const { protect, storeAccess, checkPermission } = require('../middleware/auth');
+
+// Public routes (no authentication required)
+router.get('/public', getPublicPages);
+router.get('/public/type/:type', getPageByType);
 
 // Protected routes
 router.use(protect);
@@ -26,6 +33,7 @@ router.route('/')
 router.get('/published', getPublishedPages);
 router.get('/stats', getPageStats);
 router.get('/slug/:slug', getPageBySlug);
+router.post('/create-defaults', createDefaultPages);
 
 router.route('/:id')
   .get(getPageById)

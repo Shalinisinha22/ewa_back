@@ -219,10 +219,30 @@ const getOrderStats = async (req, res) => {
 // @access  Private
 const createOrder = async (req, res) => {
   try {
-    const order = new Order({
+    // Map payment method to valid enum value
+    const paymentMethodMapping = {
+      'Cash on Delivery': 'cod',
+      'Credit Card': 'credit_card',
+      'Debit Card': 'debit_card',
+      'PayPal': 'paypal',
+      'Razorpay': 'razorpay',
+      'Stripe': 'stripe'
+    };
+
+    const orderData = {
       ...req.body,
       storeId: req.storeId
-    });
+    };
+
+    // Map payment method if it exists
+    if (orderData.payment && orderData.payment.method) {
+      orderData.payment = {
+        ...orderData.payment,
+        method: paymentMethodMapping[orderData.payment.method] || orderData.payment.method
+      };
+    }
+
+    const order = new Order(orderData);
     const savedOrder = await order.save();
     res.status(201).json(savedOrder);
   } catch (error) {

@@ -14,7 +14,6 @@ const pageSchema = new mongoose.Schema({
   },
   slug: {
     type: String,
-    required: [true, 'Page slug is required'],
     lowercase: true
   },
   content: {
@@ -35,7 +34,7 @@ const pageSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['page', 'policy', 'help', 'about', 'contact'],
+    enum: ['page', 'policy', 'help', 'about', 'contact', 'terms', 'privacy', 'shipping', 'refund'],
     default: 'page'
   },
   status: {
@@ -104,7 +103,7 @@ const pageSchema = new mongoose.Schema({
 // Indexes for efficient queries
 pageSchema.index({ storeId: 1, status: 1 });
 pageSchema.index({ storeId: 1, type: 1 });
-pageSchema.index({ slug: 1, storeId: 1 }, { unique: true });
+pageSchema.index({ slug: 1, storeId: 1 });
 pageSchema.index({ storeId: 1, 'navigation.showInMenu': 1, 'navigation.menuOrder': 1 });
 
 // Text search index
