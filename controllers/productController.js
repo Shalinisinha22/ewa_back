@@ -87,6 +87,7 @@ const getPublicProducts = async (req, res) => {
 
     const products = await Product.find(query)
       .populate('category', 'name slug')
+      .populate('subcategory', 'name slug')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -149,6 +150,7 @@ const getProducts = async (req, res) => {
 
     const products = await Product.find(query)
       .populate('category', 'name slug')
+      .populate('subcategory', 'name slug')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -177,7 +179,8 @@ const getProductById = async (req, res) => {
     const product = await Product.findOne({
       _id: req.params.id,
       storeId: req.storeId
-    }).populate('category', 'name slug');
+    }).populate('category', 'name slug')
+      .populate('subcategory', 'name slug');
 
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
@@ -221,8 +224,11 @@ const createProduct = async (req, res) => {
 
     const product = await Product.create(productData);
     
-    // Populate category before sending response
-    await product.populate('category', 'name slug');
+    // Populate category and subcategory before sending response
+    await product.populate([
+      { path: 'category', select: 'name slug' },
+      { path: 'subcategory', select: 'name slug' }
+    ]);
 
     // Update category product count
     if (product.category) {
@@ -274,8 +280,11 @@ const updateProduct = async (req, res) => {
     const updatedProduct = await product.save();
     console.log('After save - Product images:', updatedProduct.images);
     
-    // Populate category before sending response
-    await updatedProduct.populate('category', 'name slug');
+    // Populate category and subcategory before sending response
+    await updatedProduct.populate([
+      { path: 'category', select: 'name slug' },
+      { path: 'subcategory', select: 'name slug' }
+    ]);
 
     // Update category product counts
     if (oldCategoryId && oldCategoryId.toString() !== updatedProduct.category?.toString()) {
@@ -336,6 +345,7 @@ const getFeaturedProducts = async (req, res) => {
       status: 'active'
     })
       .populate('category', 'name slug')
+      .populate('subcategory', 'name slug')
       .sort({ createdAt: -1 })
       .limit(limit);
 
@@ -358,6 +368,7 @@ const getNewArrivalProducts = async (req, res) => {
       status: 'active'
     })
       .populate('category', 'name slug')
+      .populate('subcategory', 'name slug')
       .sort({ createdAt: -1 })
       .limit(limit);
 
@@ -380,6 +391,7 @@ const getTrendingProducts = async (req, res) => {
       status: 'active'
     })
       .populate('category', 'name slug')
+      .populate('subcategory', 'name slug')
       .sort({ salesCount: -1, createdAt: -1 })
       .limit(limit);
 
@@ -404,6 +416,7 @@ const getPublicProductsByCategory = async (req, res) => {
       status: 'active'
     })
       .populate('category', 'name slug')
+      .populate('subcategory', 'name slug')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -438,6 +451,7 @@ const getPublicNewArrivalProducts = async (req, res) => {
       status: 'active'
     })
       .populate('category', 'name slug')
+      .populate('subcategory', 'name slug')
       .sort({ createdAt: -1 })
       .limit(limit);
 
@@ -460,6 +474,7 @@ const getPublicTrendingProducts = async (req, res) => {
       status: 'active'
     })
       .populate('category', 'name slug')
+      .populate('subcategory', 'name slug')
       .sort({ salesCount: -1, createdAt: -1 })
       .limit(limit);
 
@@ -484,6 +499,7 @@ const getProductsByCategory = async (req, res) => {
       status: 'active'
     })
       .populate('category', 'name slug')
+      .populate('subcategory', 'name slug')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -537,6 +553,7 @@ const searchProducts = async (req, res) => {
 
     const products = await Product.find(query)
       .populate('category', 'name slug')
+      .populate('subcategory', 'name slug')
       .sort({ score: { $meta: 'textScore' }, createdAt: -1 })
       .skip(skip)
       .limit(limit);

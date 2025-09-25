@@ -14,7 +14,7 @@ const productSchema = new mongoose.Schema({
   },
   slug: {
     type: String,
-    required: [true, 'Product slug is required'],
+    required: false,
     lowercase: true
   },
   description: {
