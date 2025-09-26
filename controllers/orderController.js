@@ -319,13 +319,88 @@ const refundOrder = async (req, res) => {
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
+
+    // Check if order can be refunded
+    if (order.status === 'refunded') {
+      return res.status(400).json({ message: 'Order is already refunded' });
+    }
+
+    if (order.status === 'cancelled') {
+      return res.status(400).json({ message: 'Cannot refund cancelled order' });
+    }
+
+    const { 
+      refundReason, 
+      refundAmount, 
+      transactionId,
+      bankDetails = {}
+    } = req.body;
+
+    // Try to get bank details from request or from customer
+    let { accountHolderName, bankName, accountNumber, ifscCode, upiId } = bankDetails;
     
-    order.status = 'refunded';
+    // If no bank details provided and order has customer info, try to get from customer
+    if (!accountHolderName || !bankName || !accountNumber || !ifscCode) {
+      try {
+        const Customer = require('../models/Customer');
+        const customer = await Customer.findById(order.customer);
+        
+        if (customer && customer.bankDetails && customer.bankDetails.length > 0) {
+          const defaultBankDetails = customer.bankDetails.find(bank => bank.isDefault) || customer.bankDetails[0];
+          accountHolderName = accountHolderName || defaultBankDetails.accountHolderName;
+          bankName = bankName || defaultBankDetails.bankName;
+          accountNumber = accountNumber || defaultBankDetails.accountNumber;
+          ifscCode = ifscCode || defaultBankDetails.ifscCode;
+          upiId = upiId || defaultBankDetails.upiId;
+        }
+      } catch (error) {
+        console.error('Error fetching customer bank details:', error);
+      }
+    }
+
+    // Validate that we have required bank details
+    if (!accountHolderName || !bankName || !accountNumber || !ifscCode) {
+      return res.status(400).json({ 
+        message: 'Bank details are required for refund processing. Please provide account holder name, bank name, account number, and IFSC code.' 
+      });
+    }
+    
+    // Set refund information - update to refund_completed status
+    order.status = 'refund_completed';
     order.payment.status = 'refunded';
-    order.payment.refundedAt = new Date();
+    order.refund = {
+      amount: refundAmount || order.pricing.total,
+      reason: refundReason || 'Admin refund',
+      refundedAt: new Date(),
+      transactionId: transactionId || `REF-${Date.now()}`
+    };
+
+    // Add refund processing notes with bank details
+    if (!order.notes) order.notes = {};
+    order.notes.internal = `Refund processed with bank details: ${accountHolderName} - ${bankName} (${accountNumber}) at ${new Date().toISOString()}`;
+    if (upiId) {
+      order.notes.internal += ` | UPI ID: ${upiId}`;
+    }
+
+    // Restore stock if refunding items
+    try {
+      for (const item of order.items) {
+        const product = await Product.findById(item.product);
+        if (product && product.stock && product.stock.trackQuantity) {
+          product.stock.quantity += item.quantity;
+          await product.save();
+        }
+      }
+    } catch (stockError) {
+      console.error('Error restoring stock during refund:', stockError);
+      // Don't fail the refund if stock restoration fails
+    }
     
     const updatedOrder = await order.save();
-    res.json(updatedOrder);
+    res.json({
+      message: 'Order refunded successfully',
+      order: updatedOrder
+    });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -344,10 +419,50 @@ const cancelOrder = async (req, res) => {
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
+
+    // Check if order can be cancelled
+    if (order.status === 'cancelled') {
+      return res.status(400).json({ message: 'Order is already cancelled' });
+    }
+
+    if (order.status === 'delivered') {
+      return res.status(400).json({ message: 'Cannot cancel delivered order. Consider processing a refund instead.' });
+    }
+
+    const { reason } = req.body;
     
     order.status = 'cancelled';
+    
+    // If payment was completed, mark it as cancelled
+    if (order.payment.status === 'completed') {
+      order.payment.status = 'cancelled';
+    }
+
+    // Add cancellation reason
+    if (reason) {
+      if (!order.notes) order.notes = {};
+      order.notes.internal = `Cancelled by admin: ${reason}`;
+    }
+
+    // Restore stock if items were reduced at checkout
+    try {
+      for (const item of order.items) {
+        const product = await Product.findById(item.product);
+        if (product && product.stock && product.stock.trackQuantity) {
+          product.stock.quantity += item.quantity;
+          await product.save();
+        }
+      }
+    } catch (stockError) {
+      console.error('Error restoring stock during cancellation:', stockError);
+      // Don't fail the cancellation if stock restoration fails
+    }
+    
     const updatedOrder = await order.save();
-    res.json(updatedOrder);
+    res.json({
+      message: 'Order cancelled successfully',
+      order: updatedOrder
+    });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

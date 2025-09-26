@@ -217,7 +217,7 @@ const updateCustomerProfile = async (req, res) => {
     }
 
     // Update allowed fields
-    const allowedUpdates = ['firstName', 'lastName', 'phone', 'dateOfBirth', 'addresses', 'preferences'];
+    const allowedUpdates = ['firstName', 'lastName', 'phone', 'dateOfBirth', 'addresses', 'bankDetails', 'preferences'];
     allowedUpdates.forEach(field => {
       if (req.body[field] !== undefined) {
         customer[field] = req.body[field];
@@ -463,6 +463,142 @@ const getCustomerOrderById = async (req, res) => {
   }
 };
 
+// @desc    Cancel customer order
+// @route   PUT /api/customer/auth/orders/:id/cancel
+// @access  Private
+const cancelCustomerOrder = async (req, res) => {
+  try {
+    const Order = require('../models/Order');
+    const Product = require('../models/Product');
+    
+    const order = await Order.findOne({
+      _id: req.params.id,
+      customer: req.customer._id,
+      storeId: req.customer.storeId
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Check if order can be cancelled
+    if (order.status === 'cancelled') {
+      return res.status(400).json({ message: 'Order is already cancelled' });
+    }
+
+    if (order.status === 'delivered') {
+      return res.status(400).json({ message: 'Cannot cancel delivered order. Please contact support for returns.' });
+    }
+
+    if (order.status === 'refunded') {
+      return res.status(400).json({ message: 'Order is already refunded' });
+    }
+
+    // Cancel the order
+    order.status = 'cancelled';
+    
+    // If payment was completed, mark it as cancelled
+    if (order.payment.status === 'completed') {
+      order.payment.status = 'cancelled';
+    }
+
+    // Restore stock if items were reduced at checkout
+    try {
+      for (const item of order.items) {
+        const product = await Product.findById(item.product);
+        if (product && product.stock && product.stock.trackQuantity) {
+          product.stock.quantity += item.quantity;
+          await product.save();
+        }
+      }
+    } catch (stockError) {
+      console.error('Error restoring stock:', stockError);
+      // Don't fail the cancellation if stock restoration fails
+    }
+
+    const updatedOrder = await order.save();
+    res.json(updatedOrder);
+  } catch (error) {
+    console.error('Cancel customer order error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Request return for customer order
+// @route   POST /api/customer/auth/orders/:id/return
+// @access  Private
+const requestReturn = async (req, res) => {
+  try {
+    const Order = require('../models/Order');
+    const Customer = require('../models/Customer');
+    const { reason, notes, bankDetails } = req.body;
+    
+    const order = await Order.findOne({
+      _id: req.params.id,
+      customer: req.customer._id,
+      storeId: req.customer.storeId
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Check if order can be returned
+    if (order.status !== 'delivered') {
+      return res.status(400).json({ 
+        message: 'Order must be delivered before requesting return' 
+      });
+    }
+
+    // Validate bank details
+    if (!bankDetails || !bankDetails.accountHolderName || !bankDetails.bankName || !bankDetails.accountNumber || !bankDetails.ifscCode) {
+      return res.status(400).json({
+        message: 'Bank details are required for return request processing'
+      });
+    }
+
+    // Add return request information with bank details
+    if (!order.notes) {
+      order.notes = {};
+    }
+    
+    let bankDetailsString = `${bankDetails.accountHolderName} - ${bankDetails.bankName} (Acc: ${bankDetails.accountNumber}, IFSC: ${bankDetails.ifscCode})`;
+    if (bankDetails.upiId) {
+      bankDetailsString += `, UPI: ${bankDetails.upiId}`;
+    }
+    
+    order.notes.customer = `Return requested: ${reason || 'No reason provided'}. ${notes || ''}`;
+    order.notes.internal = `Return requested by customer on ${new Date().toISOString()} | Bank Details: ${bankDetailsString}`;
+    
+    // Store bank details in order for admin processing
+    if (!order.returnDetails) order.returnDetails = {};
+    order.returnDetails.bankDetails = bankDetails;
+    order.returnDetails.requestedAt = new Date();
+    order.returnDetails.reason = reason;
+    order.returnDetails.notes = notes;
+    
+    // Mark for admin processing
+    order.fulfillment.status = 'unfulfilled'; // Reset fulfillment
+    
+    // Add return request status to order status to show in admin
+    if (!order.returnRequested) {
+      order.returnRequested = new Date();
+    }
+    
+    // Update order status to show return requested
+    order.status = 'return_requested';
+    
+    const updatedOrder = await order.save();
+    res.json({
+      message: 'Return request submitted successfully. Our support team will review your request.',
+      order: updatedOrder
+    });
+  } catch (error) {
+    console.error('Request return error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   customerSignup,
   customerLogin,
@@ -471,5 +607,7 @@ module.exports = {
   changePassword,
   getCustomerOrders,
   createCustomerOrder,
-  getCustomerOrderById
+  getCustomerOrderById,
+  cancelCustomerOrder,
+  requestReturn
 }; 

@@ -8,7 +8,9 @@ const {
   changePassword,
   getCustomerOrders,
   createCustomerOrder,
-  getCustomerOrderById
+  getCustomerOrderById,
+  cancelCustomerOrder,
+  requestReturn
 } = require('../controllers/customerAuthController');
 const { protectCustomer } = require('../middleware/customerAuth');
 
@@ -24,5 +26,7 @@ router.put('/change-password', changePassword);
 router.get('/orders', getCustomerOrders);
 router.post('/orders', createCustomerOrder);
 router.get('/orders/:id', getCustomerOrderById);
+router.put('/orders/:id/cancel', cancelCustomerOrder);
+router.post('/orders/:id/return', requestReturn);
 
 module.exports = router; 

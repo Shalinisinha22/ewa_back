@@ -101,7 +101,7 @@ const orderSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
+    enum: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded', 'return_requested', 'refund_completed'],
     default: 'pending'
   },
   fulfillment: {
@@ -118,6 +118,20 @@ const orderSchema = new mongoose.Schema({
   notes: {
     customer: String,
     internal: String
+  },
+  returnRequested: Date,
+  returnDetails: {
+    bankDetails: {
+      accountHolderName: String,
+      bankName: String,
+      accountNumber: String,
+      ifscCode: String,
+      upiId: String,
+      branchAddress: String
+    },
+    requestedAt: Date,
+    reason: String,
+    notes: String
   },
   refund: {
     amount: Number,

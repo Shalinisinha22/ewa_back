@@ -56,6 +56,21 @@ const customerSchema = new mongoose.Schema({
     zipCode: { type: String, required: true },
     isDefault: { type: Boolean, default: false }
   }],
+  bankDetails: [{
+    accountHolderName: { type: String, required: true },
+    bankName: { type: String, required: true },
+    accountNumber: { type: String, required: true },
+    ifscCode: { type: String, required: true },
+    upiId: { type: String },
+    branchAddress: { type: String },
+    accountType: {
+      type: String,
+      enum: ['savings', 'current', 'nri'],
+      default: 'savings'
+    },
+    isDefault: { type: Boolean, default: false },
+    created: { type: Date, default: Date.now }
+  }],
   preferences: {
     newsletter: { type: Boolean, default: true },
     smsMarketing: { type: Boolean, default: false },
